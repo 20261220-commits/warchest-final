@@ -1,0 +1,1284 @@
+<!DOCTYPE html>                
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>워체스트: 패스트 듀얼 - 전장</title>
+    <style>
+        /* 기본 레이아웃 */
+        body { margin: 0; padding: 0; background-color: #1e1e24; font-family: 'Pretendard', sans-serif; color: #fff; overflow: hidden; }
+        .game-container { display: flex; width: 100vw; height: 100vh; flex-direction: row; }
+
+        .sidebar-zone { width: 320px; min-width: 320px; background-color: #2a2a35; border-right: 3px solid #3d3d4f; display: flex; flex-direction: column; align-items: center; padding: 15px; box-sizing: border-box; gap: 12px; z-index: 10; }
+        .turn-status-box { text-align: center; background: #343444; padding: 12px; border-radius: 10px; width: 100%; box-shadow: inset 0 0 10px rgba(0,0,0,0.5); box-sizing: border-box; }
+        .battle-badge-blue { background-color: #3b82f6; color: white; padding: 6px 16px; border-radius: 20px; font-weight: bold; font-size: 14px; display: inline-block; }
+
+        .board-pile-container { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; }
+        .pile-full-width { grid-column: span 2; }
+        .pile-box { background-color: #22222b; border: 2px dashed #4e4e66; border-radius: 10px; padding: 8px 4px; text-align: center; box-sizing: border-box; }
+        .pile-title { font-size: 11px; color: #9ca3af; margin-bottom: 4px; font-weight: bold; }
+        
+        .pile-slot { font-size: 15px; background: rgba(25, 25, 35, 0.8); border-radius: 8px; height: auto; min-height: 45px; padding: 5px; display: flex; gap: 8px; justify-content: center; align-items: center; flex-wrap: wrap; font-weight: bold; }
+        #discard-count { border: 1px solid #fbbf24; } 
+        #graveyard-count { border: 1px solid #ef4444; } 
+        #supply-count { border: 1px solid #10b981; }
+
+        .enemy-status-box { width: 100%; background-color: #312424; border: 1px solid #5c3535; border-radius: 10px; padding: 10px; box-sizing: border-box; }
+        .enemy-title { font-size: 12px; color: #fca5a5; font-weight: bold; margin-bottom: 8px; text-align: center; }
+        .enemy-char-list { display: flex; justify-content: space-around; gap: 5px; }
+        .enemy-token-card { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+        .enemy-token-mini { width: 50px; height: 50px; border-radius: 50%; border: 2px solid #ef4444; background-color: #451a1a; overflow: hidden; box-shadow: 0 2px 6px rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; }
+        .enemy-token-mini img { width: 100%; height: 100%; object-fit: cover; }
+        .enemy-token-name { font-size: 11px; color: #fca5a5; font-weight: bold; }
+
+        .bag-wrapper { background: radial-gradient(circle, #3e3e56 0%, #252535 100%); border: 2px solid #5a5a75; border-radius: 15px; width: 100%; padding: 12px 10px; text-align: center; box-sizing: border-box; cursor: pointer; user-select: none; transition: transform 0.1s ease, border-color 0.2s ease; }
+        .bag-wrapper:hover { transform: scale(1.02); border-color: #fbbf24; }
+        .bag-graphic { font-size: 48px; margin-bottom: 3px; }
+        .bag-label { font-size: 13px; color: #fbbf24; font-weight: bold; }
+        .bag-counter { font-size: 18px; font-weight: bold; color: #fff; }
+
+        .jiggle { animation: jiggleAnim 0.15s ease-in-out infinite alternate; }
+        @keyframes jiggleAnim { 0% { transform: scale(1) rotate(-3deg); } 100% { transform: scale(1.03) rotate(3deg); } }
+
+        .main-play-zone { flex: 1; display: flex; flex-direction: column; background-color: #f6f4ee; position: relative; overflow-y: auto; }
+        .board-zone { flex: 1; display: flex; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; min-height: 400px; }
+        #hex-board { width: 100%; height: 100%; max-width: 820px; max-height: 650px; display: block; }
+        .hex-cell { fill: #ededed; stroke: #555555; stroke-width: 2.2px; transition: fill 0.2s, stroke 0.2s, stroke-width 0.2s; }
+        .hex-blue { fill: #9bbfe8 !important; }
+        .hex-red { fill: #f3b9bc !important; }
+        .hex-yellow { fill: #fde9a6 !important; }
+
+        .player-hand-zone { flex-shrink: 0; height: 150px; min-height: 150px; background-color: rgba(239, 68, 68, 0.05); border: 3px dashed #ef4444; border-radius: 16px; margin: 0 20px 20px 20px; display: flex; justify-content: center; align-items: center; gap: 30px; padding: 15px; box-sizing: border-box; position: relative; z-index: 5; }
+        .hand-zone-title { position: absolute; top: -14px; left: 30px; background-color: #ef4444; color: #fff; padding: 4px 16px; border-radius: 12px; font-size: 13px; font-weight: bold; box-shadow: 0 4px 6px rgba(239, 68, 68, 0.3); }
+        .hand-slot-hint { color: #ef4444; font-size: 16px; font-weight: bold; pointer-events: none; opacity: 0.8; }
+        
+        .hand-token-container { position: relative; display: flex; flex-direction: column; align-items: center; }
+        .hand-token { width: 85px; height: 85px; border-radius: 50%; border: 4px solid #3b82f6; background-color: #ffffff; box-shadow: 0 6px 12px rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s; position: relative; user-select: none; }
+        .hand-token:hover, .hand-token.active { transform: translateY(-8px) scale(1.05); box-shadow: 0 12px 20px rgba(59, 130, 246, 0.6); border-color: #60a5fa; }
+        .hand-token img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; pointer-events: none; }
+        .hand-token-inner-text { position: absolute; bottom: -8px; left: 50%; transform: translateX(-50%); background: #2563eb; color: #fff; font-size: 12px; padding: 3px 10px; border-radius: 12px; font-weight: bold; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.3); border: 1px solid #fff; z-index: 2; pointer-events: none; }
+
+        .action-menu { position: absolute; top: -50px; background: #252535; border: 2px solid #3b82f6; border-radius: 8px; padding: 8px; display: flex; gap: 5px; box-shadow: 0 4px 10px rgba(0,0,0,0.6); z-index: 20; animation: popIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        .action-menu::after { content: ''; position: absolute; bottom: -8px; left: 50%; transform: translateX(-50%); border-width: 8px 8px 0; border-style: solid; border-color: #3b82f6 transparent transparent transparent; display: block; width: 0; }
+        .action-btn { background: #3b82f6; color: white; border: none; padding: 6px 12px; border-radius: 5px; font-size: 13px; font-weight: bold; cursor: pointer; white-space: nowrap; transition: background 0.1s; }
+        .action-btn:hover { background: #60a5fa; }
+        .action-btn.recruit { background: #10b981; }
+        .action-btn.recruit:hover { background: #34d399; }
+        .action-btn.reinforce { background: #f59e0b; }
+        .action-btn.reinforce:hover { background: #fbbf24; }
+        .action-btn.move { background: #8b5cf6; }
+        .action-btn.move:hover { background: #a78bfa; }
+        .action-btn.attack { background: #ef4444; }
+        .action-btn.attack:hover { background: #f87171; }
+        .action-btn.control { background: #eab308; color: #000; }
+        .action-btn.control:hover { background: #fde047; }
+        .action-btn.pass { background: #6b7280; }
+        .action-btn.pass:hover { background: #9ca3af; }
+        .action-btn.command-ability { background: #84cc16; color: white; }
+        .action-btn.command-ability:hover { background: #a3e635; }
+        
+        @keyframes popIn { 0% { opacity: 0; transform: scale(0.8) translateY(10px); } 100% { opacity: 1; transform: scale(1) translateY(0); } }
+        #animation-layer { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: rgba(0, 0, 0, 0.85); z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; transition: opacity 0.6s ease; }
+        .intro-title { font-size: 32px; font-weight: 800; color: #fbbf24; text-shadow: 0 0 20px rgba(251, 191, 36, 0.6); margin-bottom: 25px; opacity: 0; transform: translateY(-20px); transition: all 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275); text-align: center; }
+        .intro-subtitle { font-size: 16px; color: #cbd5e1; margin-top: 10px; opacity: 0; transition: opacity 0.6s ease; }
+        .anim-token { position: absolute; width: 52px; height: 52px; border-radius: 50%; box-shadow: 0 6px 12px rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; font-weight: bold; font-size: 22px; box-sizing: border-box; background-color: #fff; border: 3px solid #2563eb; overflow: hidden; }
+
+        .target-marker { cursor: pointer; transition: transform 0.2s ease-out; transform-origin: center; transform-box: fill-box; }
+        .target-marker:hover { transform: scale(1.2); }
+
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.75); z-index: 10000; justify-content: center; align-items: center; }
+        .modal-box { background: #2a2a35; border: 2px solid #10b981; border-radius: 16px; padding: 24px; text-align: center; min-width: 320px; box-shadow: 0 10px 25px rgba(0,0,0,0.8); }
+        .modal-title { color: #10b981; font-size: 18px; font-weight: bold; margin-top: 0; margin-bottom: 15px; }
+        .recruit-option-list { display: flex; justify-content: center; gap: 15px; margin: 20px 0; }
+        .recruit-card { display: flex; flex-direction: column; align-items: center; cursor: pointer; background: #343444; padding: 12px; border-radius: 10px; border: 2px solid #10b981; transition: transform 0.15s, border-color 0.15s; }
+        .recruit-card:hover { transform: translateY(-5px); border-color: #34d399; background: #3d3d52; }
+        .modal-close-btn { background: #4b5563; color: #fff; border: none; padding: 8px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 10px; }
+        .modal-close-btn:hover { background: #6b7280; }
+
+        /* 게임 화면 내 알림 토스트 (파이크 반격/방패 방어/주도권 확보 등) */
+        #game-toast-layer { position: absolute; top: 18px; left: 50%; transform: translateX(-50%); z-index: 500; display: flex; flex-direction: column; gap: 8px; align-items: center; pointer-events: none; }
+        .game-toast { background: rgba(30, 30, 36, 0.92); color: #fff; border: 2px solid #fbbf24; border-radius: 12px; padding: 10px 22px; font-size: 15px; font-weight: bold; box-shadow: 0 6px 16px rgba(0,0,0,0.4); opacity: 0; transform: translateY(-14px); transition: opacity 0.25s ease, transform 0.25s ease; white-space: nowrap; }
+        .game-toast.show { opacity: 1; transform: translateY(0); }
+
+        /* 승패 결과 오버레이 (오프닝 연출과 같은 스타일의 어두운 배경) */
+        #result-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: rgba(0, 0, 0, 0.88); z-index: 10001; flex-direction: column; justify-content: center; align-items: center; opacity: 0; transition: opacity 0.6s ease; }
+        #result-title { font-size: 56px; font-weight: 900; opacity: 0; transform: translateY(-20px); transition: all 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275); text-align: center; }
+        #result-restart-btn { display: none; opacity: 0; margin-top: 34px; background: #fbbf24; color: #1e1e24; border: none; padding: 14px 34px; border-radius: 12px; font-size: 17px; font-weight: 800; cursor: pointer; box-shadow: 0 6px 16px rgba(0,0,0,0.4); transition: opacity 0.4s ease, transform 0.15s ease; }
+        #result-restart-btn:hover { transform: translateY(-2px); background: #fcd34d; }
+    </style>
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+
+    <div class="game-container">
+        <div class="sidebar-zone">
+            <div class="turn-status-box"><span class="battle-badge-blue">내 턴</span></div>
+            <div class="board-pile-container">
+                <div class="pile-box">
+                    <div class="pile-title">🔄 버림패 (주머니행)</div>
+                    <div class="pile-slot" id="discard-count">비어있음</div>
+                </div>
+                <div class="pile-box">
+                    <div class="pile-title">🪦 묘지 (게임 제외)</div>
+                    <div class="pile-slot" id="graveyard-count">비어있음</div>
+                </div>
+                <div class="pile-box pile-full-width">
+                    <div class="pile-title">🛡️ 아군 징집소</div>
+                    <div class="pile-slot" id="supply-count"></div>
+                </div>
+            </div>
+            <div class="enemy-status-box">
+                <div class="enemy-title">⚠️ 상대방 군대 정보 (3종)</div>
+                <div class="enemy-char-list" id="enemy-char-list"></div>
+            </div>
+            <div id="token-bag" class="bag-wrapper" onclick="drawHandTokens()">
+                <div class="bag-graphic">💰</div>
+                <div class="bag-label">👇 주머니 눌러 드로우</div>
+                <div class="bag-counter"><span id="bag-count">0</span> 개</div>
+            </div>
+        </div>
+
+        <div class="main-play-zone">
+            <div id="game-toast-layer"></div>
+            <div class="board-zone">
+                <svg id="hex-board" viewBox="0 0 660 580">
+                    <defs>
+                        <g id="hex-with-gap">
+                            <polygon points="25,0 75,0 100,43.3 75,86.6 25,86.6 0,43.3" transform="translate(3, 2.6) scale(0.94)"/>
+                        </g>
+                        <clipPath id="unit-clip"><circle cx="25" cy="25" r="25" /></clipPath>
+                    </defs>
+                    <g id="hex-grid-group"></g>
+                </svg>
+            </div>
+            <div class="player-hand-zone" id="player-hand-container">
+                <div class="hand-zone-title">이번 라운드 손패</div>
+                <div class="hand-slot-hint" id="hand-hint">주머니를 눌러 토큰을 뽑으세요!</div>
+            </div>
+        </div>
+
+        <div id="animation-layer">
+            <div id="intro-title" class="intro-title">🚩 3개의 거점을 먼저 점령하세요!</div>
+            <div id="intro-subtitle" class="intro-subtitle">내 주머니 구성품 확인 중...</div>
+        </div>
+
+        <div id="result-overlay">
+            <div id="result-title"></div>
+            <button id="result-restart-btn" onclick="location.href='index.html'">🔄 다시 플레이</button>
+        </div>
+    </div>
+
+    <div id="recruit-modal" class="modal-overlay">
+        <div class="modal-box">
+            <div class="modal-title">🛡️ 징집할 캐릭터 선택</div>
+            <div id="recruit-options" class="recruit-option-list"></div>
+            <button class="modal-close-btn" onclick="closeRecruitModal()">취소</button>
+        </div>
+    </div>
+
+    <div id="command-modal" class="modal-overlay">
+        <div class="modal-box" style="border-color: #84cc16;">
+            <div class="modal-title" id="command-modal-title" style="color:#84cc16;">🚩 지시 명령 선택</div>
+            <p style="font-size:13px; color:#cbd5e1; margin-bottom:15px;">해당 아군에게 어떤 지시를 내리시겠습니까?</p>
+            <div class="recruit-option-list">
+                <button id="btn-command-move" class="action-btn move" style="font-size:15px; padding:10px 20px;" onclick="executeCommandOption('move')">이동</button>
+                <button id="btn-command-attack" class="action-btn attack" style="font-size:15px; padding:10px 20px;" onclick="executeCommandOption('attack')">공격</button>
+            </div>
+            <button class="modal-close-btn" onclick="closeCommandModal()">취소</button>
+        </div>
+    </div>
+
+    <script>
+    // -------------------------------------------------------------
+    // [추가 1] 소켓 초기화 및 멀티플레이 변수
+    // -------------------------------------------------------------
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomId = urlParams.get('room');
+    const myTeam = urlParams.get('team'); // 내 팀 (blue 또는 red)
+    const enemyTeam = (myTeam === 'blue') ? 'red' : 'blue'; // 상대 팀
+
+    let currentTurnTeam = 'blue'; // 선공은 항상 파란팀부터 시작
+    let isMyTurn = (myTeam === currentTurnTeam);
+    let initiativeHolder = null; // 왕국 토큰으로 확보한 '다음 선공권' 보유 팀 (null이면 일반 교대)
+    let gameEnded = false; // 승패가 이미 결정되었는지 여부 (중복 판정 방지)
+    
+    console.log(`[내 접속 정보] 방 번호: ${roomId}, 내 팀: ${myTeam}, 내 턴 여부: ${isMyTurn}`);
+    
+    const socket = io();
+
+    let bluePicked = JSON.parse(sessionStorage.getItem('bluePicked')) || [];
+    let redPicked = JSON.parse(sessionStorage.getItem('redPicked')) || [];
+        // 기존 bluePicked / redPicked 데이터 가져오는 로직 근처에 추가
+    const myPickedUnits = myTeam === 'blue' ? bluePicked : redPicked;
+    socket.emit('joinGameField', { roomId, team: myTeam, pickedUnits: myPickedUnits });
+    
+    // -------------------------------------------------------------
+    // [추가 2] 상대방 행동 실시간 수신 이벤트
+    // -------------------------------------------------------------
+    socket.on('onGameAction', (data) => {
+        console.log("상대방 행동 수신:", data);
+
+        if (data.action === 'executeAction') {
+            applyRemoteAction(data);
+        } else if (data.action === 'endTurn') {
+            // 상대가 보낸 다음 차례 팀 정보를 그대로 신뢰 (왕국 토큰 주도권 확보 시 같은 팀이 연속으로 턴을 가질 수 있음)
+            currentTurnTeam = data.nextTeam || enemyTeam;
+            updateTurnStatusUI();
+        }
+    });
+
+    socket.on('playerLeft', (data) => {
+        alert(`⚠️ 상대방(${data.name})이 게임을 나갔습니다. 새로고침하여 다시 시작해주세요.`);
+    });
+
+    // -------------------------------------------------------------
+    // [추가 3] 상대방 행동 내 화면 적용 함수
+    // -------------------------------------------------------------
+    // 상대방이 실제로 한 행동을 내 화면의 hexGridData에 그대로 반영한다.
+    // (보드 상태는 양쪽 클라이언트가 각자 hexGridData를 들고 있으므로, 상대가 검증까지 마친
+    //  행동 결과를 동일하게 재현하기만 하면 된다 — 손패/주머니처럼 팀 전용 자원은 건드리지 않는다.)
+    function applyRemoteAction(data) {
+        const { subAction, hexId, sourceHexId, targetHexId, token, team, attackType } = data;
+
+        if (subAction === '배치') {
+            const hex = hexGridData.find(h => h.id === hexId);
+            if (hex) { hex.unit = token.name; hex.unitOwner = team; hex.img = token.img; hex.stack = 1; }
+        }
+        else if (subAction === '강화') {
+            const hex = hexGridData.find(h => h.id === hexId);
+            if (hex) hex.stack = (hex.stack || 1) + 1;
+        }
+        else if (subAction === '이동' || subAction === '지시_이동' || subAction === '검사_연계이동') {
+            const src = hexGridData.find(h => h.id === sourceHexId);
+            const tgt = hexGridData.find(h => h.id === targetHexId);
+            if (src && tgt) {
+                tgt.unit = src.unit; tgt.unitOwner = src.unitOwner; tgt.img = src.img; tgt.stack = src.stack;
+                src.unit = null; src.unitOwner = null; src.img = null; src.stack = 0;
+            }
+        }
+        else if (subAction === '공격' || subAction === '지시_공격' || subAction === '기마병_연계공격') {
+            const src = hexGridData.find(h => h.id === sourceHexId);
+            const tgt = hexGridData.find(h => h.id === targetHexId);
+            if (tgt) {
+                // 방패병: 화살 공격 완전 무효화 (양쪽 다 변화 없음)
+                if (tgt.unit === '방패병' && attackType === '화살공격') {
+                    showGameToast('🛡️ 방패병이 화살 공격을 막아냈습니다!');
+                } else {
+                    // 파이크병 근접 반격: 공격자도 함께 전사
+                    if (tgt.unit === '파이크병' && attackType === '근접' && src) {
+                        showGameToast('🔱 파이크병이 반격했습니다!');
+                        graveyardArray.push({ isRoyal: false, name: src.unit, img: src.img });
+                        src.stack -= 1;
+                        if (src.stack <= 0) { src.unit = null; src.unitOwner = null; src.img = null; src.stack = 0; }
+                    }
+                    graveyardArray.push({ isRoyal: false, name: tgt.unit, img: tgt.img });
+                    tgt.stack -= 1;
+                    if (tgt.stack <= 0) { tgt.unit = null; tgt.unitOwner = null; tgt.img = null; tgt.stack = 0; }
+                    updatePileUI();
+                }
+            }
+        }
+        else if (subAction === '점령') {
+            const hex = hexGridData.find(h => h.id === hexId);
+            if (hex) hex.baseOwner = team;
+            checkWinCondition();
+        }
+        else if (subAction === '주도권') {
+            const teamLabel = team === 'blue' ? '🔵 파란팀' : '🔴 빨간팀';
+            showGameToast(`👑 ${teamLabel}이 왕국 토큰으로 주도권을 확보했습니다!`);
+        }
+        // '패스' / '징집'은 상대의 개인 손패·주머니·징집소에만 영향을 주는 행동이라 내 화면엔 반영할 것이 없음
+
+        renderFlatHexBoard();
+    }
+        const hexGridData = [
+            { id: 0, c: 0, r: 0, type: 'control', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 }, 
+            { id: 1, c: 0, r: 1, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+            { id: 2, c: 1, r: 0, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },  
+            { id: 3, c: 1, r: 1, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 }, 
+            { id: 4, c: 1, r: 2, type: 'control', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+            { id: 5, c: 2, r: 0, type: 'red-base', baseOwner: 'red', unit: null, unitOwner: null, img: null, stack: 0 }, 
+            { id: 6, c: 2, r: 1, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 }, 
+            { id: 7, c: 2, r: 2, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 }, 
+            { id: 8, c: 2, r: 3, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+            { id: 9, c: 3, r: 0, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },  
+            { id: 10, c: 3, r: 1, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 }, 
+            { id: 11, c: 3, r: 2, type: 'control', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 }, 
+            { id: 12, c: 3, r: 3, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 }, 
+            { id: 13, c: 3, r: 4, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+            { id: 14, c: 4, r: 0, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },  
+            { id: 15, c: 4, r: 1, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 }, 
+            { id: 16, c: 4, r: 2, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 }, 
+            { id: 17, c: 4, r: 3, type: 'blue-base', baseOwner: 'blue', unit: null, unitOwner: null, img: null, stack: 0 }, 
+            { id: 18, c: 5, r: 0, type: 'control', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 }, 
+            { id: 19, c: 5, r: 1, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 }, 
+            { id: 20, c: 5, r: 2, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+            { id: 21, c: 6, r: 0, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },  
+            { id: 22, c: 6, r: 1, type: 'control', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 }
+        ];
+
+
+        // 서버에 내 픽 정보를 전송하고 전장 입장 알림
+        socket.emit('joinGameField', { roomId, team: myTeam, pickedUnits: myPickedUnits });
+        let bagArray = []; discardArray = []; graveyardArray = []; handArray = [];       
+        let supplyData = {}; 
+        let canDraw = false;
+        let activeMenuIndex = -1; 
+        let currentActionContext = null; 
+        let commandActionData = null;
+        let followUpContext = null; // 기마병/검사 연계 행동 전역 데이터
+
+        // --- 특수 연계 행동 관리 유틸리티 ---
+        function skipFollowUp() {
+            followUpContext = null;
+            currentActionContext = null;
+            activeMenuIndex = -1;
+            closeFollowUpModal();
+            renderFlatHexBoard();
+            renderPlayerHand();
+        }
+
+        function openFollowUpModal(titleText, actionType) {
+            let modal = document.getElementById('followup-modal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'followup-modal';
+                modal.className = 'modal-overlay';
+                modal.innerHTML = `
+                    <div class="modal-box" style="border-color: #fbbf24;">
+                        <div class="modal-title" id="followup-modal-title" style="color:#fbbf24;">⚔️ 연계 행동 선택</div>
+                        <p id="followup-modal-desc" style="font-size:13px; color:#cbd5e1; margin-bottom:15px;"></p>
+                        <div class="recruit-option-list">
+                            <button id="btn-followup-exec" class="action-btn" style="font-size:15px; padding:10px 20px;"></button>
+                            <button class="action-btn pass" style="font-size:15px; padding:10px 20px;" onclick="skipFollowUp()">패스 (안함)</button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(modal);
+            }
+            
+            document.getElementById('followup-modal-title').innerText = titleText;
+            document.getElementById('followup-modal-desc').innerText = 
+                actionType === 'attack' ? '이동을 완료했습니다. 주변 적을 추가 공격하시겠습니까?' : '공격을 완료했습니다. 추가 이동을 하시겠습니까?';
+            
+            const execBtn = document.getElementById('btn-followup-exec');
+            if (actionType === 'attack') {
+                execBtn.className = 'action-btn attack';
+                execBtn.innerText = '⚔️ 추가 공격하기';
+                execBtn.onclick = () => { closeFollowUpModal(); startCavalryFollowUpAttack(); };
+            } else {
+                execBtn.className = 'action-btn move';
+                execBtn.innerText = '🏃 추가 이동하기';
+                execBtn.onclick = () => { closeFollowUpModal(); startSwordsmanFollowUpMove(); };
+            }
+            modal.style.display = 'flex';
+        }
+
+        function closeFollowUpModal() {
+            const modal = document.getElementById('followup-modal');
+            if (modal) modal.style.display = 'none';
+        }
+
+        function startCavalryFollowUpAttack() {
+            if (!followUpContext) return;
+            currentActionContext = {
+                action: '기마병_연계공격',
+                tokenIndex: -1,
+                token: { name: '기마병' },
+                targets: followUpContext.targets
+            };
+            renderFlatHexBoard();
+        }
+
+        function startSwordsmanFollowUpMove() {
+            if (!followUpContext) return;
+            currentActionContext = {
+                action: '검사_연계이동',
+                tokenIndex: -1,
+                token: { name: '검사' },
+                targets: followUpContext.targets
+            };
+            renderFlatHexBoard();
+        }
+
+        window.onload = () => {
+            // 내 진영이 blue든 red든 항상 '내가 뽑은 유닛'이 내 징집소(supply)로 들어가야 함
+            myPickedUnits.forEach(char => { supplyData[char.name] = { count: 3, img: char.img }; });
+
+            renderFlatHexBoard(); renderEnemyUnits(); renderSupply(); updatePileUI(); runOpeningSequence();
+        };
+
+        function renderSupply() {
+            const container = document.getElementById('supply-count');
+            container.innerHTML = '';
+            let hasTokens = false;
+            for (let name in supplyData) {
+                if(supplyData[name].count > 0) {
+                    hasTokens = true;
+                    container.innerHTML += `
+                        <div style="display:flex; flex-direction:column; align-items:center; font-size:10px; color:#fff;">
+                            <img src="${supplyData[name].img}" style="width:26px; height:26px; border-radius:50%; border:2px solid #10b981; object-fit:cover;" onerror="this.style.display='none'">
+                            <span style="background:#10b981; padding:0 4px; border-radius:4px; margin-top:2px;">${supplyData[name].count}</span>
+                        </div>
+                    `;
+                }
+            }
+            if (!hasTokens) container.innerHTML = '<span style="color:#9ca3af; font-size:12px;">소진됨</span>';
+        }
+
+        function renderPile(pileArray, containerId, borderColor) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
+            if (pileArray.length === 0) { container.innerHTML = '<span style="color:#9ca3af; font-size:12px;">비어있음</span>'; return; }
+
+            const counts = {};
+            pileArray.forEach(token => {
+                const key = token.isRoyal ? "왕국 토큰" : token.name;
+                if (!counts[key]) counts[key] = { count: 0, img: token.img, isRoyal: token.isRoyal };
+                counts[key].count++;
+            });
+
+            for (let key in counts) {
+                const item = counts[key];
+                const content = item.isRoyal 
+                    ? `<div style="width:26px; height:26px; border-radius:50%; border:2px solid ${borderColor}; display:flex; justify-content:center; align-items:center; font-size:12px; background:#fff;">🔵</div>`
+                    : `<img src="${item.img}" style="width:26px; height:26px; border-radius:50%; border:2px solid ${borderColor}; object-fit:cover;" onerror="this.style.display='none'">`;
+                container.innerHTML += `<div style="display:flex; flex-direction:column; align-items:center; font-size:10px; color:#fff;">${content}<span style="background:#4b5563; padding:0 4px; border-radius:4px; margin-top:2px;">${item.count}</span></div>`;
+            }
+        }
+
+        function updatePileUI() {
+            renderPile(discardArray, 'discard-count', '#fbbf24'); renderPile(graveyardArray, 'graveyard-count', '#ef4444');
+        }
+
+        function getHexCenter(hex) {
+            const startX = 40; const startY = 60; const hexH = 86.6; const colSpacing = 75;
+            const colShift = Math.abs(3 - hex.c) * (hexH / 2);
+            return { cx: startX + (hex.c * colSpacing) + 47, cy: startY + colShift + (hex.r * hexH) + 43 };
+        }
+
+        function getAdjacentHexes(centerHex) {
+            const centerPos = getHexCenter(centerHex);
+            return hexGridData.filter(h => {
+                if (h.id === centerHex.id) return false;
+                const targetPos = getHexCenter(h);
+                const distance = Math.sqrt(Math.pow(centerPos.cx - targetPos.cx, 2) + Math.pow(centerPos.cy - targetPos.cy, 2));
+                return distance < 95; 
+            });
+        }
+
+        function getHexesAtDistance2(centerHex) {
+            const adj1 = getAdjacentHexes(centerHex);
+            const dist2Set = new Set();
+            adj1.forEach(h1 => {
+                getAdjacentHexes(h1).forEach(h2 => {
+                    if (h2.id !== centerHex.id && !adj1.some(a => a.id === h2.id)) {
+                        dist2Set.add(h2);
+                    }
+                });
+            });
+            return Array.from(dist2Set);
+        }
+
+        function getStraightLineHexesAtDistance2(centerHex) {
+            const posA = getHexCenter(centerHex);
+            const adjA = getAdjacentHexes(centerHex);
+            const straightHexes = [];
+
+            adjA.forEach(B => {
+                const posB = getHexCenter(B);
+                const vAB = { x: posB.cx - posA.cx, y: posB.cy - posA.cy };
+                const lenAB = Math.sqrt(vAB.x * vAB.x + vAB.y * vAB.y);
+
+                const adjB = getAdjacentHexes(B);
+                adjB.forEach(C => {
+                    if (C.id === centerHex.id) return;
+                    const posC = getHexCenter(C);
+                    const vBC = { x: posC.cx - posB.cx, y: posC.cy - posB.cy };
+                    const lenBC = Math.sqrt(vBC.x * vBC.x + vBC.y * vBC.y);
+
+                    const dot = vAB.x * vBC.x + vAB.y * vBC.y;
+                    const cos = dot / (lenAB * lenBC);
+
+                    if (cos > 0.95 && !B.unit) {
+                        straightHexes.push(C);
+                    }
+                });
+            });
+
+            return straightHexes;
+        }
+
+        function getAdjacentEmptyHexes(centerHex) { return getAdjacentHexes(centerHex).filter(h => !h.unit); }
+
+        function renderFlatHexBoard() {
+            const group = document.getElementById('hex-grid-group');
+            group.innerHTML = '';
+
+            hexGridData.forEach(hex => {
+                const pos = getHexCenter(hex);
+                const x = pos.cx - 47; const y = pos.cy - 43;
+
+                const useTag = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+                useTag.setAttributeNS('http://www.w3.org/1999/xlink', 'href', '#hex-with-gap');
+                useTag.setAttribute('x', x); useTag.setAttribute('y', y);
+                
+                let className = 'hex-cell';
+                if (hex.type === 'blue-base') className += ' hex-blue';
+                else if (hex.type === 'red-base') className += ' hex-red';
+                else if (hex.type === 'control') className += ' hex-yellow';
+                
+                useTag.setAttribute('class', className);
+
+                if (hex.baseOwner === 'blue') { useTag.style.stroke = '#3b82f6'; useTag.style.strokeWidth = '4.5px'; } 
+                else if (hex.baseOwner === 'red') { useTag.style.stroke = '#ef4444'; useTag.style.strokeWidth = '4.5px'; } 
+                else { useTag.style.stroke = '#555555'; useTag.style.strokeWidth = '2.2px'; }
+
+                group.appendChild(useTag);
+
+                if (hex.unit) {
+                    const unitGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+                    unitGroup.setAttribute('transform', `translate(${pos.cx - 25}, ${pos.cy - 25})`);
+
+                    const imgTag = document.createElementNS('http://www.w3.org/2000/svg', 'image');
+                    imgTag.setAttribute('href', hex.img || '');
+                    imgTag.setAttribute('width', '50'); imgTag.setAttribute('height', '50');
+                    imgTag.setAttribute('clip-path', 'url(#unit-clip)');
+                    unitGroup.appendChild(imgTag);
+
+                    const borderTag = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                    borderTag.setAttribute('cx', '25'); borderTag.setAttribute('cy', '25');
+                    borderTag.setAttribute('r', '25'); borderTag.setAttribute('fill', 'none');
+                    borderTag.setAttribute('stroke', hex.unitOwner === 'blue' ? '#3b82f6' : '#ef4444');
+                    borderTag.setAttribute('stroke-width', '4');
+                    unitGroup.appendChild(borderTag);
+                    
+                    if (hex.stack > 1) {
+                        const badgeBg = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                        badgeBg.setAttribute('cx', '45'); badgeBg.setAttribute('cy', '5');
+                        badgeBg.setAttribute('r', '10'); badgeBg.setAttribute('fill', '#ef4444');
+                        badgeBg.setAttribute('stroke', '#fff'); badgeBg.setAttribute('stroke-width', '1.5');
+                        unitGroup.appendChild(badgeBg);
+
+                        const badgeText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                        badgeText.setAttribute('x', '45'); badgeText.setAttribute('y', '9');
+                        badgeText.setAttribute('font-size', '12px'); badgeText.setAttribute('fill', '#fff');
+                        badgeText.setAttribute('font-weight', 'bold'); badgeText.setAttribute('text-anchor', 'middle');
+                        badgeText.textContent = hex.stack;
+                        unitGroup.appendChild(badgeText);
+                    }
+                    group.appendChild(unitGroup);
+                }
+
+                if (currentActionContext) {
+                    const targetInfo = currentActionContext.targets.find(t => t.hexId === hex.id);
+                    if (targetInfo) {
+                        const dotGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+                        dotGroup.setAttribute('class', 'target-marker');
+                        dotGroup.onclick = () => performActionOnBoard(targetInfo.hexId, targetInfo.sourceId);
+
+                        const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                        dot.setAttribute('cx', pos.cx); dot.setAttribute('cy', pos.cy); dot.setAttribute('r', '12'); 
+                        
+                        if (currentActionContext.action === '공격' || currentActionContext.action === '지시_공격' || currentActionContext.action === '기마병_연계공격') {
+                            dot.setAttribute('fill', '#ef4444'); dot.setAttribute('stroke', '#991b1b'); 
+                        } else if (currentActionContext.action === '지시') {
+                            dot.setAttribute('fill', '#84cc16'); dot.setAttribute('stroke', '#4d7c0f'); 
+                        } else {
+                            dot.setAttribute('fill', '#10b981'); dot.setAttribute('stroke', '#047857'); 
+                        }
+                        dot.setAttribute('stroke-width', '2.5');
+                        
+                        const animate = document.createElementNS('http://www.w3.org/2000/svg', 'animate');
+                        animate.setAttribute('attributeName', 'opacity'); animate.setAttribute('values', '0.5;1;0.5');
+                        animate.setAttribute('dur', '1.5s'); animate.setAttribute('repeatCount', 'indefinite');
+                        
+                        dot.appendChild(animate); dotGroup.appendChild(dot); group.appendChild(dotGroup);
+                    }
+                }
+            });
+        }
+
+        // 게임 화면 안에서 잠깐 떴다 사라지는 알림 (alert() 대체용)
+        function showGameToast(text, duration = 2200) {
+            const layer = document.getElementById('game-toast-layer');
+            if (!layer) return;
+            const el = document.createElement('div');
+            el.className = 'game-toast';
+            el.innerText = text;
+            layer.appendChild(el);
+            requestAnimationFrame(() => el.classList.add('show'));
+            setTimeout(() => {
+                el.classList.remove('show');
+                setTimeout(() => el.remove(), 300);
+            }, duration);
+        }
+
+        // 거점(control) 3곳을 먼저 점령한 팀이 있는지 확인하고, 있으면 승패 연출을 띄운다.
+        function checkWinCondition() {
+            if (gameEnded) return;
+            const blueControl = hexGridData.filter(h => h.type === 'control' && h.baseOwner === 'blue').length;
+            const redControl = hexGridData.filter(h => h.type === 'control' && h.baseOwner === 'red').length;
+
+            let winnerTeam = null;
+            if (blueControl >= 3) winnerTeam = 'blue';
+            else if (redControl >= 3) winnerTeam = 'red';
+
+            if (winnerTeam) {
+                gameEnded = true;
+                showGameResult(winnerTeam === myTeam);
+            }
+        }
+
+        // 오프닝 연출과 같은 톤으로 화면을 어둡게 깔고, 승리/패배 텍스트 -> 2초 후 다시 플레이 버튼 노출
+        function showGameResult(didWin) {
+            const overlay = document.getElementById('result-overlay');
+            const title = document.getElementById('result-title');
+            const btn = document.getElementById('result-restart-btn');
+            if (!overlay || !title || !btn) return;
+
+            title.innerText = didWin ? '🏆 승리!' : '💀 패배...';
+            title.style.color = didWin ? '#4ade80' : '#f87171';
+            title.style.textShadow = didWin ? '0 0 30px rgba(74, 222, 128, 0.7)' : '0 0 30px rgba(248, 113, 113, 0.7)';
+
+            btn.style.display = 'none';
+            btn.style.opacity = '0';
+
+            overlay.style.display = 'flex';
+            requestAnimationFrame(() => {
+                overlay.style.opacity = '1';
+                setTimeout(() => { title.style.opacity = '1'; title.style.transform = 'translateY(0)'; }, 100);
+            });
+
+            setTimeout(() => {
+                btn.style.display = 'inline-block';
+                requestAnimationFrame(() => { btn.style.opacity = '1'; });
+            }, 2000);
+        }
+
+        function performActionOnBoard(targetHexId, sourceHexId) {
+            // 내 턴이 아니면 어떤 타일도 클릭 처리하지 않음
+            if (!isMyTurn) { alert('상대방의 턴입니다!'); return; }
+            if (!currentActionContext) return;
+
+            const { action, tokenIndex, token, targets } = currentActionContext;
+            const targetHex = hexGridData.find(h => h.id === targetHexId);
+
+            const targetInfo = targets ? targets.find(t => t.hexId === targetHexId) : null;
+            const attackType = targetInfo && targetInfo.attackType ? targetInfo.attackType : '근접';
+
+            if (action === '지시') {
+                openCommandModal(targetHexId, tokenIndex, token); return;
+            }
+
+            if (action === '배치') {
+                targetHex.unit = token.name; targetHex.unitOwner = myTeam; targetHex.img = token.img; targetHex.stack = 1;
+                handArray.splice(tokenIndex, 1);
+                discardArray.push(token);
+
+                socket.emit('gameAction', { roomId, actionData: { action: 'executeAction', subAction: '배치', hexId: targetHexId, token, team: myTeam } });
+            }
+            else if (action === '강화') {
+                targetHex.stack += 1;
+                const usedToken = handArray.splice(tokenIndex, 1)[0];
+                discardArray.push(usedToken);
+
+                socket.emit('gameAction', { roomId, actionData: { action: 'executeAction', subAction: '강화', hexId: targetHexId, token, team: myTeam } });
+            }
+            else if (action === '이동' || action === '지시_이동' || action === '검사_연계이동') {
+                const sourceHex = hexGridData.find(h => h.id === sourceHexId);
+                targetHex.unit = sourceHex.unit; targetHex.unitOwner = sourceHex.unitOwner;
+                targetHex.img = sourceHex.img; targetHex.stack = sourceHex.stack;
+
+                sourceHex.unit = null; sourceHex.unitOwner = null; sourceHex.img = null; sourceHex.stack = 0;
+
+                if (action === '이동' || action === '지시_이동') {
+                    const usedToken = handArray.splice(tokenIndex, 1)[0];
+                    discardArray.push(usedToken);
+
+                    socket.emit('gameAction', { roomId, actionData: { action: 'executeAction', subAction: action, sourceHexId, targetHexId, token, team: myTeam } });
+
+                    // 🐴 기마병 특수 능력 Check: 이동 후 주변에 적이 있으면 추가 공격 연계
+                    if (token.name === '기마병') {
+                        const adjEnemies = getAdjacentHexes(targetHex).filter(h => h.unit && h.unitOwner !== myTeam);
+                        if (adjEnemies.length > 0) {
+                            followUpContext = { unitHexId: targetHex.id, targets: adjEnemies.map(e => ({ hexId: e.id, sourceId: targetHex.id, attackType: '근접' })) };
+                            currentActionContext = null;
+                            activeMenuIndex = -1;
+                            renderFlatHexBoard();
+                            renderPlayerHand();
+                            openFollowUpModal('🐴 [기마병] 돌격 능력 트리거', 'attack');
+                            return;
+                        }
+                    }
+                } else if (action === '검사_연계이동') {
+                    followUpContext = null;
+                    socket.emit('gameAction', { roomId, actionData: { action: 'executeAction', subAction: '검사_연계이동', sourceHexId, targetHexId, token, team: myTeam } });
+                }
+            }
+            else if (action === '공격' || action === '지시_공격' || action === '기마병_연계공격') {
+                const sourceHex = hexGridData.find(h => h.id === sourceHexId);
+                let blocked = false;
+
+                // 방패병 능력: 화살 공격(궁수/석궁 사수)을 전부 무력화
+                if (targetHex.unit === '방패병' && attackType === '화살공격') {
+                    showGameToast('🛡️ 방패병이 화살 공격을 막아냈습니다!');
+                    blocked = true;
+                } else {
+                    // 파이크병 근접 반격
+                    if (targetHex.unit === '파이크병' && attackType === '근접') {
+                        showGameToast('🔱 파이크병이 반격했습니다!');
+                        graveyardArray.push({ isRoyal: false, name: sourceHex.unit, img: sourceHex.img });
+                        sourceHex.stack -= 1;
+                        if (sourceHex.stack <= 0) {
+                            sourceHex.unit = null; sourceHex.unitOwner = null; sourceHex.img = null; sourceHex.stack = 0;
+                        }
+                    }
+
+                    graveyardArray.push({ isRoyal: false, name: targetHex.unit, img: targetHex.img });
+                    targetHex.stack -= 1;
+                    if (targetHex.stack <= 0) {
+                        targetHex.unit = null; targetHex.unitOwner = null; targetHex.img = null; targetHex.stack = 0;
+                    }
+                }
+
+                if (action === '공격' || action === '지시_공격') {
+                    const usedToken = handArray.splice(tokenIndex, 1)[0];
+                    discardArray.push(usedToken);
+
+                    socket.emit('gameAction', { roomId, actionData: { action: 'executeAction', subAction: action, sourceHexId, targetHexId, token, team: myTeam, attackType, blocked } });
+
+                    // ⚔️ 검사 특수 능력 Check: 공격 후 이동 가능한 빈 칸이 있으면 추가 이동 연계
+                    if (token.name === '검사' && sourceHex.unit === '검사') {
+                        const emptyAdj = getAdjacentEmptyHexes(sourceHex);
+                        if (emptyAdj.length > 0) {
+                            followUpContext = { unitHexId: sourceHex.id, targets: emptyAdj.map(e => ({ hexId: e.id, sourceId: sourceHex.id })) };
+                            currentActionContext = null;
+                            activeMenuIndex = -1;
+                            renderFlatHexBoard();
+                            renderPlayerHand();
+                            openFollowUpModal('⚔️ [검사] 재배치 능력 트리거', 'move');
+                            return;
+                        }
+                    }
+                } else if (action === '기마병_연계공격') {
+                    followUpContext = null;
+                    socket.emit('gameAction', { roomId, actionData: { action: 'executeAction', subAction: '기마병_연계공격', sourceHexId, targetHexId, token, team: myTeam, attackType, blocked } });
+                }
+            }
+            else if (action === '점령') {
+                targetHex.baseOwner = myTeam;
+                const usedToken = handArray.splice(tokenIndex, 1)[0];
+                discardArray.push(usedToken);
+
+                socket.emit('gameAction', { roomId, actionData: { action: 'executeAction', subAction: '점령', hexId: targetHexId, token, team: myTeam } });
+                checkWinCondition();
+            }
+
+            updatePileUI(); currentActionContext = null; followUpContext = null; activeMenuIndex = -1; renderFlatHexBoard(); renderPlayerHand();
+            checkTurnEnd();
+        }
+
+        function renderEnemyUnits() {
+            const container = document.getElementById('enemy-char-list');
+            container.innerHTML = '';
+            const enemyPickedUnits = (myTeam === 'blue') ? redPicked : bluePicked;
+            enemyPickedUnits.forEach(unit => {
+                container.innerHTML += `
+                    <div class="enemy-token-card">
+                        <div class="enemy-token-mini"><img src="${unit.img || 'images/sword.jpg'}" onerror="this.style.display='none'"></div>
+                        <div class="enemy-token-name">${unit.name}</div>
+                    </div>`;
+            });
+        }
+
+        function runOpeningSequence() { 
+            const layer = document.getElementById('animation-layer');
+            const title = document.getElementById('intro-title');
+            const subtitle = document.getElementById('intro-subtitle');
+            const bag = document.getElementById('token-bag');
+
+            setTimeout(() => { title.style.opacity = '1'; title.style.transform = 'translateY(0)'; }, 300);
+            setTimeout(() => {
+                subtitle.style.opacity = '1';
+                let list = [];
+                myPickedUnits.forEach(char => {
+                    list.push({ isRoyal: false, name: char.name, img: char.img });
+                    list.push({ isRoyal: false, name: char.name, img: char.img });
+                });
+                list.push({ isRoyal: true, name: "왕국 토큰", img: null });
+
+                const centerX = window.innerWidth / 2; const centerY = window.innerHeight / 2 + 50; const spacing = 52; 
+                const startX = centerX - (((list.length - 1) * spacing) / 2);
+                let tokensCount = 0;
+
+                list.forEach((token, index) => {
+                    const el = document.createElement('div');
+                    el.className = 'anim-token';
+                    if (token.isRoyal) el.innerHTML = (myTeam === 'blue') ? '🔵' : '🔴';
+                    else el.innerHTML = `<img src="${token.img}" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display='none'">`;
+
+                    el.style.left = (startX + (index * spacing) - 26) + 'px'; el.style.top = (centerY - 26) + 'px';
+                    el.style.transform = 'scale(0)'; el.style.opacity = '0';
+                    el.style.transition = 'transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease';
+                    layer.appendChild(el);
+
+                    setTimeout(() => { el.style.transform = 'scale(1.1)'; el.style.opacity = '1'; setTimeout(() => el.style.transform = 'scale(1)', 150); }, index * 80);
+
+                    setTimeout(() => {
+                        title.style.opacity = '0'; subtitle.style.opacity = '0';
+                        const bagRect = bag.getBoundingClientRect();
+                        el.style.transition = 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)';
+                        el.style.left = (bagRect.left + (bagRect.width / 2) - 26) + 'px'; el.style.top = (bagRect.top + (bagRect.height / 2) - 26) + 'px';
+                        el.style.transform = 'scale(0.1)'; el.style.opacity = '0';
+
+                        setTimeout(() => {
+                            el.remove();
+                            document.getElementById('bag-count').innerText = ++tokensCount;
+                            bagArray.push(token);
+                            bag.classList.add('jiggle'); setTimeout(() => bag.classList.remove('jiggle'), 150);
+                            if (tokensCount === list.length) {
+                                layer.style.opacity = '0';
+                                setTimeout(() => { layer.style.display = 'none'; canDraw = true; }, 600);
+                            }
+                        }, 500);
+                    }, 2200 + (index * 70)); 
+                });
+            }, 1200);
+        }
+
+                function drawHandTokens() {
+    if (!isMyTurn) {
+        alert("상대방의 턴입니다!");
+        return;
+    }
+    if (!canDraw) return;
+    if (handArray.length > 0) {
+        alert("손패를 모두 사용해야 주머니에서 토큰을 뽑을 수 있습니다.");
+        return;
+    }
+
+    const bagCountEl = document.getElementById('bag-count');
+    if (bagArray.length < 3 && discardArray.length > 0) {
+        bagArray = bagArray.concat(discardArray);
+        discardArray = [];
+        updatePileUI();
+    }
+
+    if (bagArray.length === 0) {
+        alert("주머니와 버림패에 토큰이 더 이상 없습니다!");
+        return;
+    }
+
+    for (let i = bagArray.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [bagArray[i], bagArray[j]] = [bagArray[j], bagArray[i]];
+    }
+
+    const drawCount = Math.min(3, bagArray.length);
+    handArray = bagArray.splice(0, drawCount);
+
+    bagCountEl.innerText = bagArray.length;
+    const bagWrapper = document.getElementById('token-bag');
+    bagWrapper.classList.add('jiggle');
+    setTimeout(() => bagWrapper.classList.remove('jiggle'), 300);
+
+    renderPlayerHand();
+    socket.emit('gameAction', { roomId, actionData: { action: 'drawTokens' } });
+}
+
+        function drawWithDelay(amountToDraw) {
+            while (amountToDraw > 0 && bagArray.length > 0) {
+                const randomIndex = Math.floor(Math.random() * bagArray.length);
+                handArray.push(bagArray.splice(randomIndex, 1)[0]); amountToDraw--;
+            }
+
+            document.getElementById('bag-count').innerText = bagArray.length; renderPlayerHand(); renderFlatHexBoard();
+
+            if (amountToDraw > 0 && discardArray.length > 0) {
+                canDraw = false; const bag = document.getElementById('token-bag'); bag.classList.add('jiggle'); 
+
+                setTimeout(() => {
+                    bagArray = [...discardArray]; discardArray = []; updatePileUI(); bag.classList.remove('jiggle');
+                    while (amountToDraw > 0 && bagArray.length > 0) {
+                        const randomIndex = Math.floor(Math.random() * bagArray.length);
+                        handArray.push(bagArray.splice(randomIndex, 1)[0]); amountToDraw--;
+                    }
+                    document.getElementById('bag-count').innerText = bagArray.length;
+                    renderPlayerHand(); canDraw = true;
+                }, 800); 
+            }
+        }
+
+        function openRoyalRecruitModal(royalTokenIndex) {
+            const modal = document.getElementById('recruit-modal');
+            const optionsDiv = document.getElementById('recruit-options');
+            optionsDiv.innerHTML = '';
+            let availableCount = 0;
+            for (let name in supplyData) {
+                if (supplyData[name].count > 0) {
+                    availableCount++;
+                    const item = document.createElement('div'); item.className = 'recruit-card';
+                    item.innerHTML = `<img src="${supplyData[name].img}" style="width:50px; height:50px; border-radius:50%; object-fit:cover;">
+                        <span style="font-size:13px; font-weight:bold; margin-top:6px; color:#fff;">${name}</span>
+                        <span style="font-size:11px; color:#10b981; margin-top:2px;">남은 수량: ${supplyData[name].count}</span>`;
+                    item.onclick = () => { executeRoyalRecruit(name, royalTokenIndex); closeRecruitModal(); };
+                    optionsDiv.appendChild(item);
+                }
+            }
+            if (availableCount === 0) { alert("징집소에 남아있는 유닛 코인이 없습니다!"); return; }
+            modal.style.display = 'flex';
+        }
+
+        function closeRecruitModal() { document.getElementById('recruit-modal').style.display = 'none'; }
+
+        function executeRoyalRecruit(unitName, royalTokenIndex) {
+            if (supplyData[unitName] && supplyData[unitName].count > 0) {
+                supplyData[unitName].count--;
+                discardArray.push({ isRoyal: false, name: unitName, img: supplyData[unitName].img });
+                discardArray.push(handArray.splice(royalTokenIndex, 1)[0]);
+                updatePileUI(); renderSupply(); activeMenuIndex = -1; renderFlatHexBoard(); renderPlayerHand();
+            }
+        }
+        
+        // [신규 추가] UI 상단에 현재 턴 상태 표시 (팀 색상 및 상태)
+        function updateTurnStatusUI() {
+            isMyTurn = (myTeam === currentTurnTeam);
+            const badge = document.querySelector('.turn-status-box span');
+            if (badge) {
+                if (isMyTurn) {
+                    badge.className = 'battle-badge-blue';
+                    badge.style.backgroundColor = (myTeam === 'blue') ? '#3b82f6' : '#ef4444';
+                    badge.innerText = `내 턴 (${myTeam === 'blue' ? '🔵 파란팀' : '🔴 빨간팀'})`;
+                } else {
+                    badge.className = 'battle-badge-blue';
+                    badge.style.backgroundColor = '#6b7280';
+                    badge.innerText = `상대방 턴 대기중...`;
+                }
+            }
+        }
+        updateTurnStatusUI();
+        // [신규 추가] 손패를 다 썼을 때 턴을 넘기는 함수
+        // 왕국 토큰으로 '주도권'을 확보해둔 경우, 다음 턴은 정상 교대 대신 주도권을 가진 팀이 가져감(연속 턴 가능)
+        function checkTurnEnd() {
+            if (handArray.length === 0) {
+                let nextTeam;
+                if (initiativeHolder) {
+                    nextTeam = initiativeHolder;
+                    initiativeHolder = null;
+                } else {
+                    nextTeam = enemyTeam;
+                }
+                currentTurnTeam = nextTeam;
+                updateTurnStatusUI();
+                socket.emit('gameAction', { roomId, actionData: { action: 'endTurn', nextTeam } });
+            }
+        }
+        function openCommandModal(allyHexId, tokenIndex, token) {
+            const allyHex = hexGridData.find(h => h.id === allyHexId);
+            const canMove = getAdjacentEmptyHexes(allyHex).length > 0;
+            let canAttack = false;
+            
+            if (allyHex.unit !== '궁수') {
+                if (getAdjacentHexes(allyHex).some(h => h.unit && h.unitOwner !== myTeam)) canAttack = true;
+            }
+            
+            if (allyHex.unit === '석궁사수') {
+                if (getStraightLineHexesAtDistance2(allyHex).some(h => h.unit && h.unitOwner !== myTeam)) canAttack = true;
+            }
+            else if (allyHex.unit === '궁수') {
+                if (getHexesAtDistance2(allyHex).some(h => h.unit && h.unitOwner !== myTeam)) canAttack = true;
+            }
+
+            document.getElementById('command-modal-title').innerText = `🚩 [${allyHex.unit}] 행동 지시`;
+            document.getElementById('btn-command-move').style.display = canMove ? 'block' : 'none';
+            document.getElementById('btn-command-attack').style.display = canAttack ? 'block' : 'none';
+
+            if (!canMove && !canAttack) { alert("이 아군은 주변에 이동할 곳이나 공격할 적이 없습니다!"); currentActionContext = null; renderFlatHexBoard(); return; }
+
+            commandActionData = { allyHexId, tokenIndex, token }; document.getElementById('command-modal').style.display = 'flex';
+        }
+
+        function closeCommandModal() {
+            document.getElementById('command-modal').style.display = 'none'; commandActionData = null; currentActionContext = null; renderFlatHexBoard();
+        }
+
+        function executeCommandOption(type) {
+            const { allyHexId, tokenIndex, token } = commandActionData;
+            const allyHex = hexGridData.find(h => h.id === allyHexId);
+            
+            if (type === 'move') {
+                const targets = getAdjacentEmptyHexes(allyHex).map(t => ({ hexId: t.id, sourceId: allyHex.id }));
+                currentActionContext = { action: '지시_이동', tokenIndex, token, targets };
+            } else if (type === 'attack') {
+                let targets = [];
+                
+                if (allyHex.unit !== '궁수') {
+                    getAdjacentHexes(allyHex).filter(h => h.unit && h.unitOwner !== myTeam).forEach(t => targets.push({ hexId: t.id, sourceId: allyHex.id, attackType: '근접' }));
+                }
+                
+                if (allyHex.unit === '석궁사수') {
+                    getStraightLineHexesAtDistance2(allyHex).filter(h => h.unit && h.unitOwner !== myTeam).forEach(t => {
+                        if (!targets.some(tgt => tgt.hexId === t.id && tgt.sourceId === allyHex.id)) {
+                            targets.push({ hexId: t.id, sourceId: allyHex.id, attackType: '화살공격' });
+                        }
+                    });
+                }
+                else if (allyHex.unit === '궁수') {
+                    getHexesAtDistance2(allyHex).filter(h => h.unit && h.unitOwner !== myTeam).forEach(t => {
+                        if (!targets.some(tgt => tgt.hexId === t.id && tgt.sourceId === allyHex.id)) {
+                            targets.push({ hexId: t.id, sourceId: allyHex.id, attackType: '화살공격' });
+                        }
+                    });
+                }
+
+                currentActionContext = { action: '지시_공격', tokenIndex, token, targets };
+            }
+
+            document.getElementById('command-modal').style.display = 'none'; commandActionData = null; renderFlatHexBoard();
+        }
+
+        function executeAction(actionName, tokenIndex, token) {
+    // 1. 내 턴이 아니면 행동 불가
+    if (!isMyTurn) {
+        alert("상대방의 턴입니다!");
+        return;
+    }
+
+    currentActionContext = null;
+
+    // 2. 패스 행동 처리
+    if (actionName === '패스') {
+        const usedToken = handArray.splice(tokenIndex, 1)[0];
+        discardArray.push(usedToken);
+        updatePileUI();
+        
+        // 상대방에게 패스 알림
+        socket.emit('gameAction', {
+            roomId,
+            actionData: { action: 'executeAction', subAction: '패스', token: usedToken, team: myTeam }
+        });
+
+        finishAction();
+        return;
+    }
+
+    // 2-1. 왕국 토큰: 주도권 확보 처리 (이미 주도권을 갖고 있으면 사용 불가)
+    else if (actionName === '주도권 확보') {
+        if (initiativeHolder === myTeam) {
+            showGameToast('⚠️ 이미 주도권을 확보한 상태입니다!');
+            return;
+        }
+
+        const usedToken = handArray.splice(tokenIndex, 1)[0];
+        discardArray.push(usedToken);
+        updatePileUI();
+
+        initiativeHolder = myTeam; // 이번 손패를 다 쓰고 나면(라운드 전환) 우리 팀이 다음 턴을 가져감
+
+        socket.emit('gameAction', {
+            roomId,
+            actionData: { action: 'executeAction', subAction: '주도권', token: usedToken, team: myTeam }
+        });
+
+        showGameToast('👑 왕국 토큰으로 주도권을 확보했습니다! 이번 손패를 모두 사용하면 다음 턴도 우리 팀 차례입니다.', 3000);
+        finishAction();
+        return;
+    }
+
+    // 3. 징집 행동 처리
+    else if (actionName === '징집') {
+        if (token.isRoyal) {
+            openRoyalRecruitModal(tokenIndex);
+            return;
+        }
+        else if (supplyData[token.name] && supplyData[token.name].count > 0) {
+            supplyData[token.name].count--;
+            discardArray.push({ isRoyal: false, name: token.name, img: token.img });
+            discardArray.push(handArray.splice(tokenIndex, 1)[0]);
+            
+            socket.emit('gameAction', {
+                roomId,
+                actionData: { action: 'executeAction', subAction: '징집', token: token, team: myTeam }
+            });
+
+            finishAction();
+            return;
+        }
+    }
+
+    // 4. 배치 행동 처리
+    else if (actionName === '배치') {
+        const isOnBoard = hexGridData.some(h => h.unit === token.name && h.unitOwner === myTeam);
+        const emptyMainBases = token.name === '정찰병'
+            ? hexGridData.filter(h => h.baseOwner === myTeam && h.unit === null)
+            : hexGridData.filter(h => h.type === (myTeam + '-base') && h.baseOwner === myTeam && h.unit === null);
+            
+        if (!isOnBoard && emptyMainBases.length > 0) {
+            currentActionContext = { action: '배치', tokenIndex, token, targets: emptyMainBases.map(h => ({ hexId: h.id })) };
+        }
+    }
+
+    // 5. 강화 행동 처리
+    else if (actionName === '강화') {
+        const myUnits = hexGridData.filter(h => h.unit === token.name && h.unitOwner === myTeam);
+        if (myUnits.length > 0) {
+            currentActionContext = { action: '강화', tokenIndex, token, targets: myUnits.map(h => ({ hexId: h.id })) };
+        }
+    }
+
+    // 6. 이동 행동 처리
+    else if (actionName === '이동') {
+        const myUnits = hexGridData.filter(h => h.unit === token.name && h.unitOwner === myTeam);
+        let targets = [];
+        myUnits.forEach(u => {
+            getAdjacentHexes(u).filter(h => h.unit === null).forEach(t => {
+                targets.push({ hexId: t.id, sourceId: u.id });
+            });
+        });
+        if (targets.length > 0) currentActionContext = { action: '이동', tokenIndex, token, targets };
+    }
+
+    // 7. 공격 행동 처리
+    else if (actionName === '공격') {
+        const myUnits = hexGridData.filter(h => h.unit === token.name && h.unitOwner === myTeam);
+        let targets = [];
+        myUnits.forEach(u => {
+            // 궁수는 근접 공격이 불가능하고 오직 2칸 거리 사격만 가능
+            if (token.name !== '궁수') {
+                getAdjacentHexes(u).filter(h => h.unit !== null && h.unitOwner !== myTeam).forEach(t => {
+                    targets.push({ hexId: t.id, sourceId: u.id, attackType: '근접' });
+                });
+            }
+
+            if (token.name === '궁수') {
+                getHexesAtDistance2(u).filter(h => h.unit !== null && h.unitOwner !== myTeam).forEach(t => {
+                    if (!targets.some(x => x.hexId === t.id && x.sourceId === u.id)) {
+                        targets.push({ hexId: t.id, sourceId: u.id, attackType: '화살공격' });
+                    }
+                });
+            }
+        });
+        if (targets.length > 0) currentActionContext = { action: '공격', tokenIndex, token, targets };
+    }
+
+    // 8. 점령 행동 처리
+    else if (actionName === '점령') {
+        const myUnits = hexGridData.filter(h => h.unit === token.name && h.unitOwner === myTeam && (h.type === 'control' || h.type === 'red-base' || h.type === 'blue-base') && h.baseOwner !== myTeam);
+        if (myUnits.length > 0) currentActionContext = { action: '점령', tokenIndex, token, targets: myUnits.map(h => ({ hexId: h.id })) };
+    }
+
+    // 9. 지시 행동 처리
+    else if (actionName === '지시') {
+        const myEnsigns = hexGridData.filter(h => h.unit === '군기' && h.unitOwner === myTeam);
+        let targetSet = new Set();
+        let targets = [];
+        myEnsigns.forEach(ensign => {
+            getAdjacentHexes(ensign).filter(h => h.unit && h.unitOwner === myTeam).forEach(t => {
+                if(!targetSet.has(t.id)) { targetSet.add(t.id); targets.push({ hexId: t.id, sourceId: ensign.id }); }
+            });
+        });
+        if (targets.length > 0) currentActionContext = { action: '지시', tokenIndex, token, targets };
+    }
+
+    // 하이라이트/타일 가이드 갱신 UI
+    if (typeof renderFlatHexBoard === 'function') renderFlatHexBoard();
+}
+
+        function renderPlayerHand() {
+            const handContainer = document.getElementById('player-hand-container');
+            handContainer.innerHTML = '<div class="hand-zone-title">이번 라운드 손패</div>';
+            if (handArray.length === 0) { handContainer.innerHTML += `<div class="hand-slot-hint" id="hand-hint">주머니를 눌러 토큰을 뽑으세요!</div>`; return; }
+
+            handArray.forEach((token, index) => {
+                const wrapper = document.createElement('div'); wrapper.className = 'hand-token-container';
+                const tokenEl = document.createElement('div'); tokenEl.className = `hand-token ${activeMenuIndex === index ? 'active' : ''}`;
+                
+                if (token.isRoyal) { tokenEl.innerHTML = `<span style="font-size:42px;">${myTeam === 'blue' ? '🔵' : '🔴'}</span><div class="hand-token-inner-text">왕국 토큰</div>`; } 
+                else { tokenEl.innerHTML = `<img src="${token.img}" alt="${token.name}" onerror="this.style.display='none'"><div class="hand-token-inner-text">${token.name}</div>`; }
+
+                tokenEl.onclick = () => {
+                    if (currentActionContext) { currentActionContext = null; renderFlatHexBoard(); }
+                    activeMenuIndex = (activeMenuIndex === index) ? -1 : index; renderPlayerHand();
+                };
+                wrapper.appendChild(tokenEl);
+
+                if (activeMenuIndex === index) {
+                    const menu = document.createElement('div'); menu.className = 'action-menu';
+                    let actions = [];
+                    
+                    if (token.isRoyal) {
+                        actions = ['패스', '징집'];
+                        if (initiativeHolder !== myTeam) actions.splice(1, 0, '주도권 확보');
+                    }
+                    else {
+                        const myUnits = hexGridData.filter(h => h.unit === token.name && h.unitOwner === myTeam);
+                        const isOnBoard = myUnits.length > 0;
+                        let canMove = false; let canAttack = false; let canCommand = false;
+
+                        if (isOnBoard) {
+                            myUnits.forEach(u => {
+                                if (getAdjacentEmptyHexes(u).length > 0) canMove = true;
+                                
+                                if (token.name !== '궁수') {
+                                    if (getAdjacentHexes(u).some(h => h.unit && h.unitOwner !== myTeam)) canAttack = true;
+                                }
+                                
+                                if (token.name === '석궁사수') {
+                                    if (getStraightLineHexesAtDistance2(u).some(h => h.unit && h.unitOwner !== myTeam)) canAttack = true;
+                                }
+                                else if (token.name === '궁수') {
+                                    if (getHexesAtDistance2(u).some(h => h.unit && h.unitOwner !== myTeam)) canAttack = true;
+                                }
+                                
+                                if (token.name === '군기') {
+                                    if (getAdjacentHexes(u).some(h => h.unit && h.unitOwner === myTeam)) canCommand = true;
+                                }
+                            });
+                        }
+                        
+                        const canReinforce = isOnBoard;
+                        const emptyMainBases = token.name === '정찰병'
+                            ? hexGridData.filter(h => h.baseOwner === myTeam && h.unit === null)
+                            : hexGridData.filter(h => h.type === (myTeam + '-base') && h.baseOwner === myTeam && h.unit === null);
+                        const canDeploy = !isOnBoard && emptyMainBases.length > 0;
+                        const canControl = isOnBoard && myUnits.some(h => (h.type === 'control' || h.type === 'red-base' || h.type === 'blue-base') && h.baseOwner !== myTeam);
+                        const hasSupply = supplyData[token.name] && supplyData[token.name].count > 0;
+                        const canRecruit = !isOnBoard && !canDeploy && hasSupply;
+
+                        if (canMove) actions.push('이동');
+                        if (canAttack) actions.push('공격');
+                        if (canReinforce) actions.push('강화');
+                        if (canCommand) actions.push('지시');
+                        if (canDeploy) actions.push('배치');
+                        if (canControl) actions.push('점령');
+                        if (canRecruit) actions.push('징집'); 
+                        actions.push('패스');
+                    }
+
+                    actions.forEach(action => {
+                        const btn = document.createElement('button');
+                        btn.className = `action-btn ${action === '징집' ? 'recruit' : ''} ${action === '강화' ? 'reinforce' : ''} ${action === '이동' ? 'move' : ''} ${action === '공격' ? 'attack' : ''} ${action === '점령' ? 'control' : ''} ${action === '지시' ? 'command-ability' : ''} ${action === '패스' ? 'pass' : ''}`;
+                        btn.innerText = action; btn.onclick = (e) => { e.stopPropagation(); executeAction(action, index, token); };
+                        menu.appendChild(btn);
+                    });
+                    wrapper.appendChild(menu);
+                }
+                handContainer.appendChild(wrapper);
+            });
+        }
+
+        // [신규 추가] 행동 완료 처리 함수 (패스/징집/주도권 확보 등 보드 클릭이 필요 없는 행동 후 호출)
+        function finishAction() {
+    currentActionContext = null;
+    updatePileUI();
+    if (typeof renderSupply === 'function') renderSupply();
+    if (typeof renderPlayerHand === 'function') renderPlayerHand();
+    if (typeof renderFlatHexBoard === 'function') renderFlatHexBoard();
+    
+    // 손패가 0개인지 확인하고 턴 전환
+    checkTurnEnd();
+}
+    </script>
+</body>
+</html>

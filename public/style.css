@@ -1,0 +1,304 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+body {
+    background-color: #f7f3eb;
+    color: #3c4043;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    overflow: hidden;
+}
+
+/* 기본 컨테이너 박스 틀 */
+.game-container {
+    width: 95%;
+    max-width: 500px;
+    height: auto;
+    min-height: 580px;
+    max-height: 94vh;
+    overflow-y: auto;
+    background-color: #ffffff;
+    border: 2px solid #3c4043;
+    border-radius: 24px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.08);
+    padding: 35px;
+    position: relative;
+    transition: max-width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 🆕 [수정] 게임화면에 진입하면 네모 박스 틀을 완전히 날려버리는 스타일 */
+.game-container.game-mode {
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    max-width: 1200px !important;
+    padding: 0 !important;
+    overflow: visible !important;
+}
+
+.game-container::-webkit-scrollbar { width: 8px; }
+.game-container::-webkit-scrollbar-track { background: #f7f3eb; border-radius: 10px; }
+.game-container::-webkit-scrollbar-thumb { background: #ffe082; border: 2px solid #f7f3eb; border-radius: 10px; }
+
+.screen {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+    text-align: center;
+    position: relative;
+}
+
+.hidden { display: none !important; }
+.title-logo { margin-bottom: 20px; }
+.title-logo h1 { font-size: 3.2rem; font-weight: 800; letter-spacing: -1px; color: #3c4043; line-height: 1.1; }
+.sub-title { font-size: 2.2rem; font-weight: 700; }
+.game-desc { font-size: 1rem; color: #80868b; margin-bottom: 40px; }
+.text-blue { color: #9ec5fe; }
+.text-red { color: #f8b4b4; }
+
+.btn {
+    width: 100%;
+    padding: 16px;
+    border: 2px solid #3c4043;
+    border-radius: 14px;
+    font-size: 1.1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 0 #3c4043;
+}
+.btn:active { transform: translateY(4px); box-shadow: 0 0px 0 #3c4043; }
+.btn-yellow { background-color: #ffe082; color: #3c4043; }
+.btn-yellow:hover { background-color: #ffd54f; }
+.btn-blue { background-color: #9ec5fe; color: #1a4480; }
+.btn-blue:hover { background-color: #7faeff; }
+.btn-red { background-color: #f8b4b4; color: #7a2222; }
+.btn-red:hover { background-color: #f59898; }
+
+#screen-lobby h2 { font-size: 2rem; margin-bottom: 8px; }
+.lobby-desc { font-size: 0.95rem; color: #80868b; margin-bottom: 40px; }
+.input-group { width: 100%; text-align: left; margin-bottom: 20px; }
+.input-group label { display: block; font-size: 0.9rem; font-weight: 700; margin-bottom: 8px; color: #5f6368; }
+.input-group input { width: 100%; padding: 14px; border: 2px solid #3c4043; border-radius: 12px; font-size: 1rem; outline: none; background-color: #fafafa; }
+.input-group input:focus { background-color: #ffffff; border-color: #ffe082; }
+.lobby-buttons { width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 20px; }
+
+/* 대기실 */
+.room-header { margin-bottom: 30px; }
+.room-id-badge { display: inline-block; background-color: #ffe082; color: #3c4043; border: 2px solid #3c4043; padding: 6px 18px; border-radius: 12px; font-weight: 700; font-size: 0.95rem; margin-top: 8px; }
+.room-players { width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 25px; }
+.player-slot { background-color: #fffaf1; border: 2px solid #3c4043; border-radius: 18px; padding: 24px 12px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.slot-blue { background-color: rgba(158, 197, 254, 0.15); }
+.slot-red { background-color: rgba(248, 180, 180, 0.15); }
+.player-slot.empty { border-style: dashed; background-color: #fafafa; opacity: 0.6; }
+.slot-icon { font-size: 2.5rem; }
+.player-name { font-weight: 700; font-size: 1.05rem; color: #3c4043; }
+.player-status { font-size: 0.8rem; padding: 4px 12px; border-radius: 20px; border: 1px solid #3c4043; font-weight: 700; }
+.status-master { background-color: #9ec5fe; color: #1a4480; }
+.status-ready { background-color: #f8b4b4; color: #7a2222; }
+.status-waiting { background-color: #e0e0e0; color: #757575; border-style: dashed; }
+
+/* 토글 스위치 */
+.room-settings { margin-bottom: 30px; display: flex; justify-content: center; width: 100%; }
+.toggle-container { display: flex; align-items: center; cursor: pointer; gap: 12px; user-select: none; }
+.toggle-container input { display: none; }
+.toggle-slider { width: 46px; height: 24px; background-color: #e0e0e0; border: 2px solid #3c4043; border-radius: 12px; position: relative; transition: background-color 0.2s; }
+.toggle-slider::before { content: ""; position: absolute; width: 14px; height: 14px; background-color: #3c4043; border-radius: 50%; top: 3px; left: 3px; transition: transform 0.2s; }
+.toggle-container input:checked + .toggle-slider { background-color: #ffe082; }
+.toggle-container input:checked + .toggle-slider::before { transform: translateX(22px); }
+.toggle-label { font-weight: 700; font-size: 1rem; color: #5f6368; }
+
+/* 캐릭터 선택창 */
+.intro-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: #ffffff; display: flex; justify-content: center; align-items: center; z-index: 10; transition: opacity 0.5s ease; border-radius: 22px; }
+.intro-text { font-size: 3.5rem; font-weight: 800; color: #3c4043; letter-spacing: 2px; animation: textScale 1.5s ease-in-out infinite; }
+
+.timer-container { width: 100%; height: 12px; background-color: #e0e0e0; border: 2px solid #3c4043; border-radius: 6px; overflow: hidden; margin-bottom: 15px; }
+.timer-bar { width: 0%; height: 100%; background-color: #ffe082; }
+
+#screen-draft { width: 100%; padding: 0; }
+.draft-header { margin-bottom: 20px; }
+.turn-badge { display: inline-block; padding: 8px 24px; border-radius: 20px; font-weight: 700; font-size: 1rem; border: 2px solid #3c4043; }
+.badge-blue { background-color: #9ec5fe; color: #1a4480; }
+.badge-red { background-color: #f8b4b4; color: #7a2222; }
+
+.draft-layout { display: grid; grid-template-columns: 220px 1fr 220px; gap: 20px; width: 100%; }
+.character-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.char-tile { background-color: #fffaf1; border: 2px solid #3c4043; border-radius: 16px; padding: 12px; cursor: pointer; position: relative; transition: all 0.25s ease; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+
+.char-img-wrapper { width: 70px; height: 70px; background-color: #ffffff; border: 2px solid #3c4043; border-radius: 12px; display: flex; justify-content: center; align-items: center; overflow: hidden; }
+.char-img-file { width: 100%; height: 100%; object-fit: cover; border-radius: 10px; }
+.char-name { font-weight: 700; font-size: 0.95rem; color: #3c4043; }
+
+/* 툴팁 */
+.char-tooltip { visibility: hidden; opacity: 0; position: absolute; bottom: 110%; left: 50%; transform: translateX(-50%) translateY(10px); width: 200px; background-color: #3c4043; color: #ffffff; text-align: left; padding: 12px; border-radius: 10px; font-size: 0.85rem; line-height: 1.4; z-index: 5; box-shadow: 0 6px 16px rgba(0,0,0,0.15); transition: all 0.2s ease; pointer-events: none; }
+.char-tooltip::after { content: ""; position: absolute; top: 100%; left: 50%; margin-left: -6px; border-width: 6px; border-style: solid; border-color: #3c4043 transparent transparent transparent; }
+.char-tile:hover { transform: translateY(-5px); background-color: #ffe082; box-shadow: 0 6px 12px rgba(0,0,0,0.05); }
+.char-tile:hover .char-tooltip { visibility: visible; opacity: 1; transform: translateX(-50%) translateY(0); }
+
+.char-tile.picked { opacity: 0.2; cursor: not-allowed; transform: scale(0.9); }
+.char-tile.moved-blue { transform: translateX(-40px) scale(0.8); opacity: 0; transition: all 0.4s ease; }
+.char-tile.moved-red { transform: translateX(40px) scale(0.8); opacity: 0; transition: all 0.4s ease; }
+
+.panel { border: 2px solid #3c4043; border-radius: 18px; padding: 15px; display: flex; flex-direction: column; min-height: 320px; }
+.panel h3 { font-size: 0.9rem; margin-bottom: 15px; padding-bottom: 6px; border-bottom: 2px dashed #3c4043; }
+.panel-blue { background-color: rgba(158, 197, 254, 0.15); }
+.panel-red { background-color: rgba(248, 180, 180, 0.15); }
+
+.picked-slots { display: flex; flex-direction: column; gap: 10px; flex-grow: 1; }
+.picked-item-badge { background-color: #ffffff; border: 2px solid #3c4043; border-radius: 12px; padding: 8px 12px; display: flex; align-items: center; gap: 12px; }
+.picked-item-badge .char-img-wrapper { width: 35px; height: 35px; border-radius: 6px; }
+.picked-item-badge .char-tooltip { display: none; }
+
+/* ======================================================== */
+/* 🚀 본격 게임 전장 화면 (주머니 왼쪽, 판은 오른쪽/가운데 배치) */
+/* ======================================================== */
+#screen-game { width: 100%; padding: 10px 0; }
+
+.game-battle-layout {
+    display: grid;
+    /* 🔄 [수정] 왼쪽 240px 주머니 영역, 오른쪽 남은 공간(1fr) 전체를 전장으로 할당 */
+    grid-template-columns: 240px 1fr; 
+    gap: 40px;
+    width: 100%;
+    align-items: center;
+}
+
+/* 🔄 [수정] 오른쪽 보드판 구역: 깔고있던 네모난 흰 박스 테두리 모두 투명화 제거 */
+.board-zone {
+    background: none !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#hex-board {
+    width: 100%;
+    max-width: 820px; /* 판 크기 확장 */
+    max-height: 520px;
+}
+
+/* 격자 디자인 */
+.hex-cell {
+    fill: #fdfaf4;
+    stroke: #3c4043;
+    stroke-width: 1.8;
+    transition: fill 0.2s;
+}
+.hex-blue { fill: #9ec5fe; }    
+.hex-red { fill: #f8b4b4; }     
+.hex-yellow { fill: #ffe082; }  
+
+/* 왼쪽: 사이드바 주머니 시스템 */
+.sidebar-zone {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    align-items: center;
+    width: 100%;
+}
+.turn-status-box {
+    width: 100%;
+    background-color: #ffffff;
+    border: 2px solid #3c4043;
+    border-radius: 16px;
+    padding: 15px;
+    box-shadow: 0 4px 0 #3c4043;
+}
+.battle-badge-blue {
+    display: inline-block;
+    background-color: #9ec5fe;
+    color: #1a4480;
+    border: 1px solid #3c4043;
+    font-weight: 700;
+    padding: 4px 12px;
+    border-radius: 10px;
+    font-size: 0.85rem;
+    margin-bottom: 6px;
+}
+.battle-timer { font-weight: 700; font-size: 1.1rem; color: #3c4043; }
+
+/* 코인 주머니 상자 */
+.bag-wrapper {
+    width: 100%;
+    background-color: #fff;
+    border: 2px solid #3c4043;
+    border-radius: 20px;
+    padding: 30px 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 6px 0 #3c4043;
+    position: relative;
+    user-select: none;
+}
+.bag-graphic {
+    font-size: 4rem;
+    filter: drop-shadow(0 4px 4px rgba(0,0,0,0.1));
+}
+.bag-label { font-weight: 800; font-size: 1.1rem; color: #3c4043; }
+.bag-counter {
+    background-color: #3c4043;
+    color: #ffffff;
+    font-weight: 700;
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-size: 0.95rem;
+}
+#bag-count { color: #ffe082; }
+
+/* 주머니 흔들림 애니메이션 */
+@keyframes jiggle {
+    0% { transform: scale(1) rotate(0deg); }
+    25% { transform: scale(1.05) rotate(-4deg); }
+    75% { transform: scale(1.05) rotate(4deg); }
+    100% { transform: scale(1) rotate(0deg); }
+}
+.bag-wrapper.jiggle { animation: jiggle 0.2s ease-in-out; }
+
+/* 실시간 토큰 이동 애니메이션 레이어 */
+#animation-layer {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    pointer-events: none; 
+    z-index: 999;
+}
+.anim-token {
+    position: absolute;
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    border: 3px solid #3c4043;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 1.2rem;
+    transition: transform 0.8s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.8s ease;
+    overflow: hidden;
+}
+.border-blue { border-color: #1a4480; background-color: #9ec5fe; }
+.border-red { border-color: #7a2222; background-color: #f8b4b4; }
+
+@keyframes textScale { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+@keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.03); } 100% { transform: scale(1); } }
+.animate-pulse { animation: pulse 2s infinite ease-in-out; }
+.animate-pop { animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+@keyframes popIn { 0% { transform: scale(0.6); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+
+@media (max-width: 900px) {
+    .draft-layout { grid-template-columns: 1fr; }
+    .character-grid { grid-template-columns: repeat(2, 1fr); }
+    .game-battle-layout { grid-template-columns: 1fr; }
+}

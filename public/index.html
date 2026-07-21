@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>워체스트: 패스트 듀얼 - 로비</title>
+   <link rel="stylesheet" href="style.css">
+   <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+
+
+   <div class="game-container" id="main-container">
+       <div id="screen-title" class="screen">
+           <div class="title-logo">
+               <h1>WAR CHEST</h1>
+               <h2 class="sub-title"><span class="text-blue">FAST</span> <span class="text-red">DUEL</span></h2>
+           </div>
+           <p class="game-desc">5분간 펼쳐지는 압축 전술 보드게임</p>
+           <button id="btn-start" class="btn btn-yellow animate-pulse">BATTLE START</button>
+       </div>
+
+
+       <div id="screen-lobby" class="screen hidden">
+           <h2>전장 입장</h2>
+           <p class="lobby-desc">닉네임을 입력하고 방을 만들거나 참여하세요.</p>
+          
+           <div class="input-group">
+               <label for="user-name">닉네임</label>
+               <input type="text" id="user-name" placeholder="플레이어 이름 입력" maxlength="10">
+           </div>
+
+
+           <div class="input-group">
+               <label for="room-id">방 번호 (입력시 참여)</label>
+               <input type="text" id="room-id" placeholder="생성시 비워두세요" maxlength="6">
+           </div>
+
+
+           <div class="lobby-buttons">
+               <button id="btn-create" class="btn btn-blue">방 만들기</button>
+               <button id="btn-join" class="btn btn-red">방 참여하기</button>
+           </div>
+       </div>
+
+
+       <div id="screen-room" class="screen hidden">
+           <div class="room-header">
+               <h2>게임 대기실</h2>
+               <div class="room-id-badge">ROOM ID : <span id="display-room-id">------</span></div>
+           </div>
+          
+           <div class="room-players">
+               <div class="player-slot slot-blue" id="p1-slot">
+                   <div class="slot-icon" id="p1-icon">🔵</div>
+                   <div class="player-name" id="p1-name">방장 대기 중...</div>
+                   <div class="player-status status-master" id="p1-status">HOST</div>
+               </div>
+
+
+               <div class="player-slot slot-red empty" id="p2-slot">
+                   <div class="slot-icon" id="p2-icon">❔</div>
+                   <div class="player-name" id="p2-name">상대방 대기 중...</div>
+                   <div class="player-status status-waiting" id="p2-status">WAITING</div>
+               </div>
+           </div>
+
+
+           <div class="room-settings">
+               <label class="toggle-container">
+                   <input type="checkbox" id="use-timer" checked>
+                   <span class="toggle-slider"></span>
+                   <span class="toggle-label">제한시간 적용 (10초)</span>
+               </label>
+           </div>
+
+
+           <button id="btn-match-start" class="btn btn-yellow">게임 시작하기</button>
+           <div id="waiting-host-msg" class="lobby-desc text-yellow hidden">방장이 게임을 시작하길 기다리는 중...</div>
+       </div>
+
+
+       <div id="screen-draft" class="screen hidden">
+           <div id="draft-intro-overlay" class="intro-overlay">
+               <h1 class="intro-text">팀 선택</h1>
+           </div>
+
+
+           <div class="timer-container">
+               <div id="timer-bar" class="timer-bar"></div>
+           </div>
+
+
+           <div class="draft-header">
+               <div id="turn-indicator" class="turn-badge badge-blue">파란팀 차례 (1픽)</div>
+           </div>
+
+
+           <div class="draft-layout">
+               <div class="panel panel-blue">
+                   <h3>BLUE TEAM</h3>
+                   <div id="list-blue" class="picked-slots"></div>
+               </div>
+
+
+               <div class="character-grid" id="char-grid">
+                   <div class="char-tile" data-char="pike" data-name="파이크병" data-img="images/pike.jpg">
+                       <div class="char-img-wrapper"><img src="images/pike.jpg" alt="파이크병" class="char-img-file"></div>
+                       <div class="char-name">파이크병</div>
+                       <div class="char-tooltip">자신을 근거리에서 죽인 공격한 상대에게 공격을 하여 함께 죽습니다.</div>
+                   </div>
+                   <div class="char-tile" data-char="shield" data-name="방패병" data-img="images/shield.jpg">
+                       <div class="char-img-wrapper"><img src="images/shield.jpg" alt="방패병" class="char-img-file"></div>
+                       <div class="char-name">방패병</div>
+                       <div class="char-tooltip">궁수나 석궁사수의 모든 화살 공격을 무시합니다.</div>
+                   </div>
+                   <div class="char-tile" data-char="banner" data-name="군기" data-img="images/banner.jpg">
+                       <div class="char-img-wrapper"><img src="images/banner.jpg" alt="군기" class="char-img-file"></div>
+                       <div class="char-name">군기</div>
+                       <div class="char-tooltip">자신 주변 1칸 내에 있는 아군에게 행동 1가지를 지시합니다.</div>
+                   </div>
+                   <div class="char-tile" data-char="cavalry" data-name="기마병" data-img="images/cavalry.jpg">
+                       <div class="char-img-wrapper"><img src="images/cavalry.jpg" alt="기마병" class="char-img-file"></div>
+                       <div class="char-name">기마병</div>
+                       <div class="char-tooltip">한칸 이동 후 공격할 수 있습니다.</div>
+                   </div>
+                   <div class="char-tile" data-char="archer" data-name="궁수" data-img="images/archer.jpg">
+                       <div class="char-img-wrapper"><img src="images/archer.jpg" alt="궁수" class="char-img-file"></div>
+                       <div class="char-name">궁수</div>
+                       <div class="char-tooltip">두 칸 거리의 상대에게 공격할 수 있지만, 근접한 1칸 거리의 상대에게는 공격이 불가능합니다.</div>
+                   </div>
+                   <div class="char-tile" data-char="scout" data-name="정찰병" data-img="images/scout.jpg">
+                       <div class="char-img-wrapper"><img src="images/scout.jpg" alt="정찰병" class="char-img-file"></div>
+                       <div class="char-name">정찰병</div>
+                       <div class="char-tooltip">본진이 아니라 아군이 이미 점령해둔 거점에서 시작할 수 있습니다.</div>
+                   </div>
+                   <div class="char-tile" data-char="crossbow" data-name="석궁사수" data-img="images/crossbow.jpg">
+                       <div class="char-img-wrapper"><img src="images/crossbow.jpg" alt="석궁사수" class="char-img-file"></div>
+                       <div class="char-name">석궁사수</div>
+                       <div class="char-tooltip">일직선 방향으로 최대 2칸까지 적을 저격합니다.</div>
+                   </div>
+                   <div class="char-tile" data-char="sword" data-name="검사" data-img="images/sword.jpg">
+                       <div class="char-img-wrapper"><img src="images/sword.jpg" alt="검사" class="char-img-file"></div>
+                       <div class="char-name">검사</div>
+                       <div class="char-tooltip">적을 공격하면 1칸을 이동할 수 있습니다.</div>
+                   </div>
+               </div>
+
+
+               <div class="panel panel-red">
+                   <h3>RED TEAM</h3>
+                   <div id="list-red" class="picked-slots"></div>
+               </div>
+           </div>
+       </div>
+   </div>
+
+
+   <script>
+       // Socket.io 통신 객체 초기화
+       const socket = io();
+
+
+       const btnStart = document.getElementById('btn-start');
+       const btnCreate = document.getElementById('btn-create');
+       const btnJoin = document.getElementById('btn-join');
+       const btnMatchStart = document.getElementById('btn-match-start');
+       const waitingHostMsg = document.getElementById('waiting-host-msg');
+
+
+       const container = document.getElementById('main-container');
+       const screenTitle = document.getElementById('screen-title');
+       const screenLobby = document.getElementById('screen-lobby');
+       const screenRoom = document.getElementById('screen-room');
+       const screenDraft = document.getElementById('screen-draft');
+
+
+       let bluePicked = [];
+       let redPicked = [];
+
+
+       // 실시간 소켓 연동 변수
+       let myTeam = null;
+       let currentRoomId = null;
+       let myName = "";
+
+
+       btnStart.addEventListener('click', () => {
+           screenTitle.classList.add('hidden');
+           screenLobby.classList.remove('hidden');
+       });
+
+
+       // 방 만들기 / 참여하기 로직
+       const enterWaitingRoom = (isCreate) => {
+           myName = document.getElementById('user-name').value.trim();
+           let roomVal = document.getElementById('room-id').value.trim();
+
+
+           if (!myName) {
+               alert('닉네임을 입력해주세요!');
+               return;
+           }
+
+
+           if (isCreate) {
+               currentRoomId = String(Math.floor(100000 + Math.random() * 900000));
+           } else {
+               if (!roomVal) {
+                   alert('참여할 방 번호를 입력해 주세요!');
+                   return;
+               }
+               currentRoomId = roomVal;
+           }
+
+
+           // 서버에 입장 요청
+           socket.emit('joinRoom', { roomId: currentRoomId, userName: myName });
+       };
+
+
+       btnCreate.addEventListener('click', () => enterWaitingRoom(true));
+       btnJoin.addEventListener('click', () => enterWaitingRoom(false));
+
+
+       // 서버에서 방 상태 수신 (양쪽 화면 UI 완전 동기화)
+       socket.on('roomStateUpdate', (room) => {
+           screenLobby.classList.add('hidden');
+           screenRoom.classList.remove('hidden');
+
+
+           document.getElementById('display-room-id').innerText = room.roomId;
+
+
+           const p1 = room.players.find(p => p.team === 'blue');
+           const p2 = room.players.find(p => p.team === 'red');
+
+
+           // 내 팀 파악
+           const me = room.players.find(p => p.id === socket.id);
+           if (me) myTeam = me.team;
+
+
+           // 블루팀(방장) UI 업데이트
+           if (p1) {
+               document.getElementById('p1-name').innerText = p1.name;
+               document.getElementById('p1-status').innerText = "HOST";
+               document.getElementById('p1-status').className = "player-status status-master";
+           }
+
+
+           // 레드팀(참여자) UI 업데이트
+           const p2Slot = document.getElementById('p2-slot');
+           if (p2) {
+               p2Slot.classList.remove('empty');
+               document.getElementById('p2-icon').innerText = "🔴";
+               document.getElementById('p2-name').innerText = p2.name;
+               document.getElementById('p2-status').innerText = "READY";
+               document.getElementById('p2-status').className = "player-status status-ready";
+           } else {
+               p2Slot.classList.add('empty');
+               document.getElementById('p2-icon').innerText = "❔";
+               document.getElementById('p2-name').innerText = "상대방 대기 중...";
+               document.getElementById('p2-status').innerText = "WAITING";
+               document.getElementById('p2-status').className = "player-status status-waiting";
+           }
+
+
+           // 권한별 시작 버튼 / 대기 메시지 UI 설정
+           if (myTeam === 'blue') {
+               waitingHostMsg.classList.add('hidden');
+               btnMatchStart.style.display = 'block';
+               if (room.players.length === 2) {
+                   btnMatchStart.disabled = false;
+                   btnMatchStart.style.opacity = '1';
+                   btnMatchStart.innerText = '게임 시작하기';
+               } else {
+                   btnMatchStart.disabled = true;
+                   btnMatchStart.style.opacity = '0.5';
+                   btnMatchStart.innerText = '상대방 대기 중...';
+               }
+           } else {
+               btnMatchStart.style.display = 'none';
+               waitingHostMsg.classList.remove('hidden');
+           }
+       });
+
+
+       socket.on('roomFull', (data) => {
+           alert(data.message);
+       });
+
+       socket.on('playerLeft', (data) => {
+           alert(`${data.team === 'blue' ? '파란팀' : '빨간팀'} 플레이어(${data.name})가 나갔습니다.`);
+       });
+
+
+       let draftOrder = ['blue', 'red', 'red', 'blue', 'blue', 'red'];
+       let currentStep = 0;
+       let timerInterval = null;
+       let isTimerEnabled = true;
+       const LIMIT_TIME = 10000;
+
+
+       // 방장이 게임 시작 버튼을 누르면 서버로 전송
+       btnMatchStart.addEventListener('click', () => {
+           if (btnMatchStart.disabled) return;
+           isTimerEnabled = document.getElementById('use-timer').checked;
+           socket.emit('startMatch', { roomId: currentRoomId, isTimerEnabled });
+       });
+
+
+       // 양쪽 동시 드래프트 화면 진입
+       socket.on('matchStarted', (data) => {
+           isTimerEnabled = data.isTimerEnabled;
+
+
+           screenRoom.classList.add('hidden');
+           screenDraft.classList.remove('hidden');
+           container.style.maxWidth = '1100px';
+
+
+           const timerContainer = document.querySelector('.timer-container');
+           if (!isTimerEnabled) timerContainer.style.display = 'none';
+           else timerContainer.style.display = 'block';
+
+
+           const overlay = document.getElementById('draft-intro-overlay');
+           setTimeout(() => {
+               overlay.style.opacity = '0';
+               setTimeout(() => { overlay.classList.add('hidden'); }, 500);
+               startDraftTimer();
+           }, 1500);
+       });
+
+
+       function startDraftTimer() {
+           if (timerInterval) cancelAnimationFrame(timerInterval);
+           if (!isTimerEnabled) return;
+
+
+           const timerBar = document.getElementById('timer-bar');
+           let start = null;
+
+
+           function animateTimer(timestamp) {
+               if (!start) start = timestamp;
+               let elapsed = timestamp - start;
+               let progress = Math.min((elapsed / LIMIT_TIME) * 100, 100);
+               timerBar.style.width = progress + '%';
+
+
+               if (elapsed < LIMIT_TIME) {
+                   timerInterval = requestAnimationFrame(animateTimer);
+               } else {
+                   if (myTeam === draftOrder[currentStep]) {
+                       alert(`${draftOrder[currentStep].toUpperCase()} 팀 시간 초과!`);
+                   }
+               }
+           }
+           timerInterval = requestAnimationFrame(animateTimer);
+       }
+
+
+       // 드래프트 캐릭터 타일 클릭 이벤트
+       const tiles = document.querySelectorAll('.char-tile');
+       tiles.forEach(tile => {
+           tile.addEventListener('click', function() {
+               if (this.classList.contains('picked') || currentStep >= draftOrder.length) return;
+
+
+               const currentTurnTeam = draftOrder[currentStep];
+
+
+               // 내 턴이 아니면 클릭 차단
+               if (myTeam !== currentTurnTeam) {
+                   alert('상대방 턴입니다! 기다려주세요.');
+                   return;
+               }
+
+
+               const charName = this.getAttribute('data-name');
+               const charImg = this.getAttribute('data-img');
+               const charType = this.getAttribute('data-char');
+
+
+               // 서버로 선택 유닛 정보 전송
+               socket.emit('selectTile', {
+                   roomId: currentRoomId,
+                   team: myTeam,
+                   charName,
+                   charImg,
+                   charType,
+                   step: currentStep
+               });
+           });
+       });
+
+
+       // 서버로부터 유닛 선택 정보 실시간 수신 (양쪽 동기화)
+       socket.on('tileSelected', (data) => {
+           const { team, charName, charImg, charType } = data;
+
+
+           const targetTile = Array.from(tiles).find(t => t.getAttribute('data-char') === charType);
+
+
+           if (targetTile) {
+               targetTile.classList.add('picked', `moved-${team}`);
+
+
+               if (team === 'blue') bluePicked.push({ name: charName, img: charImg });
+               else redPicked.push({ name: charName, img: charImg });
+
+
+               const clone = targetTile.cloneNode(true);
+               clone.className = 'picked-item-badge animate-pop';
+
+
+               if (team === 'blue') {
+                   document.getElementById('list-blue').appendChild(clone);
+               } else {
+                   document.getElementById('list-red').appendChild(clone);
+               }
+           }
+
+
+           nextTurn();
+       });
+
+
+       function nextTurn() {
+           currentStep++;
+           const indicator = document.getElementById('turn-indicator');
+
+
+           if (currentStep < draftOrder.length) {
+               const nextTeam = draftOrder[currentStep];
+               indicator.innerText = `${nextTeam === 'blue' ? '파란팀' : '빨간팀'} 차례 (${currentStep + 1}픽)`;
+               indicator.className = `turn-badge badge-${nextTeam}`;
+               startDraftTimer();
+           } else {
+               if (timerInterval) cancelAnimationFrame(timerInterval);
+               indicator.innerText = "선택 완료! 전장으로 이동합니다...";
+               indicator.className = "turn-badge btn-yellow";
+
+
+               // URL Query String으로 방 번호(room)와 팀(team) 정보를 함께 전달
+               setTimeout(() => {
+                   sessionStorage.setItem('bluePicked', JSON.stringify(bluePicked));
+                   sessionStorage.setItem('redPicked', JSON.stringify(redPicked));
+                   window.location.href = `game.html?room=${currentRoomId}&team=${myTeam}`;
+               }, 1800);
+           }
+       }
+   </script>
+</body>
+</html>
+
