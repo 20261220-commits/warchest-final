@@ -210,7 +210,18 @@
     let redPicked = JSON.parse(sessionStorage.getItem('redPicked')) || [];
         // 기존 bluePicked / redPicked 데이터 가져오는 로직 근처에 추가
     const myPickedUnits = myTeam === 'blue' ? bluePicked : redPicked;
-    socket.emit('joinGameField', { roomId, team: myTeam, pickedUnits: myPickedUnits });
+
+    // 최초 접속 시는 물론, 네트워크가 순간적으로 끊겼다가 자동 재연결됐을 때도 매번 실행되어
+    // 서버에게 "나 이 방의 이 팀이야" 라고 다시 알려준다. 이게 없으면 재연결 시 서버가
+    // 해당 플레이어를 방에서 빠진 것으로 처리해서 상대에게 잘못된 '나갔습니다' 알림이 가고,
+    // 이후 서로의 행동도 더 이상 전달되지 않아 화면이 어긋나게 된다.
+    socket.on('connect', () => {
+        socket.emit('joinGameField', { roomId, team: myTeam, pickedUnits: myPickedUnits });
+    });
+
+    socket.on('playerReconnected', (data) => {
+        showGameToast(`🔌 ${data.team === 'blue' ? '파란팀' : '빨간팀'} 재접속 완료`);
+    });
     
     // -------------------------------------------------------------
     // [추가 2] 상대방 행동 실시간 수신 이벤트
@@ -318,8 +329,6 @@
         ];
 
 
-        // 서버에 내 픽 정보를 전송하고 전장 입장 알림
-        socket.emit('joinGameField', { roomId, team: myTeam, pickedUnits: myPickedUnits });
         let bagArray = []; discardArray = []; graveyardArray = []; handArray = [];       
         let supplyData = {}; 
         let canDraw = false;
