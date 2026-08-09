@@ -100,6 +100,10 @@
         .game-toast { background: rgba(30, 30, 36, 0.92); color: #fff; border: 2px solid #fbbf24; border-radius: 12px; padding: 10px 22px; font-size: 15px; font-weight: bold; box-shadow: 0 6px 16px rgba(0,0,0,0.4); opacity: 0; transform: translateY(-14px); transition: opacity 0.25s ease, transform 0.25s ease; white-space: nowrap; }
         .game-toast.show { opacity: 1; transform: translateY(0); }
 
+        /* 우측 상단 주도권(선공권) 표시 배지 */
+        #initiative-badge { position: absolute; top: 18px; right: 18px; z-index: 400; background: rgba(30, 30, 36, 0.92); border: 2px solid #4b5563; border-radius: 12px; padding: 8px 16px; font-size: 14px; font-weight: bold; color: #cbd5e1; box-shadow: 0 4px 12px rgba(0,0,0,0.35); white-space: nowrap; transition: border-color 0.3s ease, color 0.3s ease; }
+        #initiative-badge.mine { border-color: #fbbf24; color: #fbbf24; }
+
         /* 승패 결과 오버레이 (오프닝 연출과 같은 스타일의 어두운 배경) */
         #result-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: rgba(0, 0, 0, 0.88); z-index: 10001; flex-direction: column; justify-content: center; align-items: center; opacity: 0; transition: opacity 0.6s ease; }
         #result-title { font-size: 56px; font-weight: 900; opacity: 0; transform: translateY(-20px); transition: all 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275); text-align: center; }
@@ -140,6 +144,7 @@
 
         <div class="main-play-zone">
             <div id="game-toast-layer"></div>
+            <div id="initiative-badge">👑 주도권: 없음</div>
             <div class="board-zone">
                 <svg id="hex-board" viewBox="0 0 660 580">
                     <defs>
@@ -199,7 +204,8 @@
 
     let currentTurnTeam = 'blue'; // 선공은 항상 파란팀부터 시작
     let isMyTurn = (myTeam === currentTurnTeam);
-    let initiativeHolder = null; // 왕국 토큰으로 확보한 '다음 선공권' 보유 팀 (null이면 일반 교대)
+    let initiativeHolder = null; // 왕국 토큰으로 확보한 '다음 선공권' 보유 팀 (null이면 일반 교대) - 오직 확보한 본인 클라이언트의 턴 종료 로직에서만 사용됨
+    let initiativeDisplay = null; // 우측 상단 표시 전용 (양쪽 클라이언트에 동기화됨, 게임 로직에는 영향 없음)
     let gameEnded = false; // 승패가 이미 결정되었는지 여부 (중복 판정 방지)
     
     console.log(`[내 접속 정보] 방 번호: ${roomId}, 내 팀: ${myTeam}, 내 턴 여부: ${isMyTurn}`);
@@ -234,6 +240,10 @@
         } else if (data.action === 'endTurn') {
             // 상대가 보낸 다음 차례 팀 정보를 그대로 신뢰 (왕국 토큰 주도권 확보 시 같은 팀이 연속으로 턴을 가질 수 있음)
             currentTurnTeam = data.nextTeam || enemyTeam;
+            if (data.initiativeConsumed) {
+                initiativeDisplay = null;
+                updateInitiativeUI();
+            }
             updateTurnStatusUI();
         }
     });
@@ -297,6 +307,8 @@
         else if (subAction === '주도권') {
             const teamLabel = team === 'blue' ? '🔵 파란팀' : '🔴 빨간팀';
             showGameToast(`👑 ${teamLabel}이 왕국 토큰으로 주도권을 확보했습니다!`);
+            initiativeDisplay = team;
+            updateInitiativeUI();
         }
         // '패스' / '징집'은 상대의 개인 손패·주머니·징집소에만 영향을 주는 행동이라 내 화면엔 반영할 것이 없음
 
@@ -958,8 +970,16 @@
             if (supplyData[unitName] && supplyData[unitName].count > 0) {
                 supplyData[unitName].count--;
                 discardArray.push({ isRoyal: false, name: unitName, img: supplyData[unitName].img });
-                discardArray.push(handArray.splice(royalTokenIndex, 1)[0]);
-                updatePileUI(); renderSupply(); activeMenuIndex = -1; renderFlatHexBoard(); renderPlayerHand();
+                const usedToken = handArray.splice(royalTokenIndex, 1)[0];
+                discardArray.push(usedToken);
+
+                socket.emit('gameAction', {
+                    roomId,
+                    actionData: { action: 'executeAction', subAction: '징집', token: usedToken, team: myTeam }
+                });
+
+                activeMenuIndex = -1;
+                finishAction(); // 손패가 비었으면 여기서 정상적으로 턴이 넘어감
             }
         }
         
@@ -980,20 +1000,40 @@
             }
         }
         updateTurnStatusUI();
+
+        // 우측 상단 주도권 표시 배지 갱신 (양쪽 화면에 동기화된 initiativeDisplay 값을 그대로 반영)
+        function updateInitiativeUI() {
+            const el = document.getElementById('initiative-badge');
+            if (!el) return;
+            if (initiativeDisplay) {
+                const teamLabel = initiativeDisplay === 'blue' ? '🔵 파란팀' : '🔴 빨간팀';
+                el.innerText = `👑 주도권: ${teamLabel}`;
+                el.classList.toggle('mine', initiativeDisplay === myTeam);
+            } else {
+                el.innerText = `👑 주도권: 없음`;
+                el.classList.remove('mine');
+            }
+        }
+        updateInitiativeUI();
+
         // [신규 추가] 손패를 다 썼을 때 턴을 넘기는 함수
         // 왕국 토큰으로 '주도권'을 확보해둔 경우, 다음 턴은 정상 교대 대신 주도권을 가진 팀이 가져감(연속 턴 가능)
         function checkTurnEnd() {
             if (handArray.length === 0) {
                 let nextTeam;
+                let initiativeConsumed = false;
                 if (initiativeHolder) {
                     nextTeam = initiativeHolder;
                     initiativeHolder = null;
+                    initiativeDisplay = null;
+                    initiativeConsumed = true;
+                    updateInitiativeUI();
                 } else {
                     nextTeam = enemyTeam;
                 }
                 currentTurnTeam = nextTeam;
                 updateTurnStatusUI();
-                socket.emit('gameAction', { roomId, actionData: { action: 'endTurn', nextTeam } });
+                socket.emit('gameAction', { roomId, actionData: { action: 'endTurn', nextTeam, initiativeConsumed } });
             }
         }
         function openCommandModal(allyHexId, tokenIndex, token) {
@@ -1097,6 +1137,8 @@
         updatePileUI();
 
         initiativeHolder = myTeam; // 이번 손패를 다 쓰고 나면(라운드 전환) 우리 팀이 다음 턴을 가져감
+        initiativeDisplay = myTeam;
+        updateInitiativeUI();
 
         socket.emit('gameAction', {
             roomId,
