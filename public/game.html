@@ -336,6 +336,7 @@
             closeFollowUpModal();
             renderFlatHexBoard();
             renderPlayerHand();
+            checkTurnEnd(); // 연계 행동을 안 하고 넘어갈 때도 손패가 비었으면 턴을 넘겨야 함
         }
 
         function openFollowUpModal(titleText, actionType) {
@@ -454,7 +455,19 @@
         function getHexCenter(hex) {
             const startX = 40; const startY = 60; const hexH = 86.6; const colSpacing = 75;
             const colShift = Math.abs(3 - hex.c) * (hexH / 2);
-            return { cx: startX + (hex.c * colSpacing) + 47, cy: startY + colShift + (hex.r * hexH) + 43 };
+            let cx = startX + (hex.c * colSpacing) + 47;
+            let cy = startY + colShift + (hex.r * hexH) + 43;
+
+            if (myTeam === 'red') {
+                // 빨간팀 화면에서는 보드를 180도 돌려서, 실제 마주 앉아 플레이하는 것처럼
+                // 자기 본진이 항상 화면 아래쪽/자기 쪽에 오도록 좌표를 뷰박스 중심 기준으로 반전한다.
+                // (유닛 이미지/텍스트 자체는 회전시키지 않고 배치 좌표만 반전하므로 그대로 똑바로 보임)
+                const viewBoxW = 660, viewBoxH = 580;
+                cx = viewBoxW - cx;
+                cy = viewBoxH - cy;
+            }
+
+            return { cx, cy };
         }
 
         function getAdjacentHexes(centerHex) {
@@ -1144,8 +1157,8 @@
         const myUnits = hexGridData.filter(h => h.unit === token.name && h.unitOwner === myTeam);
         let targets = [];
         myUnits.forEach(u => {
-            // 궁수는 근접 공격이 불가능하고 오직 2칸 거리 사격만 가능
-            if (token.name !== '궁수') {
+            // 궁수/석궁사수는 근접 공격이 불가능하고 오직 원거리 사격만 가능
+            if (token.name !== '궁수' && token.name !== '석궁사수') {
                 getAdjacentHexes(u).filter(h => h.unit !== null && h.unitOwner !== myTeam).forEach(t => {
                     targets.push({ hexId: t.id, sourceId: u.id, attackType: '근접' });
                 });
@@ -1153,6 +1166,15 @@
 
             if (token.name === '궁수') {
                 getHexesAtDistance2(u).filter(h => h.unit !== null && h.unitOwner !== myTeam).forEach(t => {
+                    if (!targets.some(x => x.hexId === t.id && x.sourceId === u.id)) {
+                        targets.push({ hexId: t.id, sourceId: u.id, attackType: '화살공격' });
+                    }
+                });
+            }
+
+            // 석궁사수: 일직선 방향으로 정확히 2칸 거리 저격 (중간에 다른 유닛이 있으면 불가)
+            if (token.name === '석궁사수') {
+                getStraightLineHexesAtDistance2(u).filter(h => h.unit !== null && h.unitOwner !== myTeam).forEach(t => {
                     if (!targets.some(x => x.hexId === t.id && x.sourceId === u.id)) {
                         targets.push({ hexId: t.id, sourceId: u.id, attackType: '화살공격' });
                     }
