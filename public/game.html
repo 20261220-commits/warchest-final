@@ -42,7 +42,7 @@
 
         .main-play-zone { flex: 1; display: flex; flex-direction: column; background-color: #f6f4ee; position: relative; overflow-y: auto; }
         .board-zone { flex: 1; display: flex; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; min-height: 400px; }
-        #hex-board { width: 100%; height: 100%; max-width: 820px; max-height: 650px; display: block; }
+        #hex-board { width: 100%; height: 100%; max-width: 920px; max-height: 730px; display: block; }
         .hex-cell { fill: #ededed; stroke: #555555; stroke-width: 2.2px; transition: fill 0.2s, stroke 0.2s, stroke-width 0.2s; }
         .hex-blue { fill: #9bbfe8 !important; }
         .hex-red { fill: #f3b9bc !important; }
@@ -104,6 +104,19 @@
         #initiative-badge { position: absolute; top: 18px; right: 18px; z-index: 400; background: rgba(30, 30, 36, 0.92); border: 2px solid #4b5563; border-radius: 12px; padding: 8px 16px; font-size: 14px; font-weight: bold; color: #cbd5e1; box-shadow: 0 4px 12px rgba(0,0,0,0.35); white-space: nowrap; transition: border-color 0.3s ease, color 0.3s ease; }
         #initiative-badge.mine { border-color: #fbbf24; color: #fbbf24; }
 
+        /* 내 턴이 되었을 때 잠깐 뜨는 큰 알림 배너 */
+        #turn-banner { position: fixed; top: 40%; left: 50%; transform: translate(-50%, -50%) scale(0.7); z-index: 10002; pointer-events: none; opacity: 0; transition: opacity 0.35s ease, transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        #turn-banner.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+        #turn-banner-text { font-size: 46px; font-weight: 900; color: #fff; padding: 18px 46px; border-radius: 18px; background: rgba(20, 20, 26, 0.85); border: 3px solid #fbbf24; box-shadow: 0 0 40px rgba(251, 191, 36, 0.55); white-space: nowrap; }
+
+        /* 좌측 상단 상대 손패 표시 */
+        #enemy-hand-display { position: absolute; top: 18px; left: 18px; z-index: 400; background: rgba(30, 30, 36, 0.92); border: 2px solid #4b5563; border-radius: 12px; padding: 10px 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.35); }
+        .enemy-hand-title { font-size: 12px; font-weight: bold; color: #cbd5e1; margin-bottom: 6px; }
+        .enemy-hand-empty { font-size: 12px; color: #6b7280; }
+        .enemy-hand-tokens { display: flex; gap: 6px; }
+        .enemy-hand-token { width: 34px; height: 34px; border-radius: 8px; border: 2px solid #6b7280; overflow: hidden; display: flex; align-items: center; justify-content: center; font-size: 18px; background: #1e1e24; }
+        .enemy-hand-token img { width: 100%; height: 100%; object-fit: cover; }
+
         /* 승패 결과 오버레이 (오프닝 연출과 같은 스타일의 어두운 배경) */
         #result-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: rgba(0, 0, 0, 0.88); z-index: 10001; flex-direction: column; justify-content: center; align-items: center; opacity: 0; transition: opacity 0.6s ease; }
         #result-title { font-size: 56px; font-weight: 900; opacity: 0; transform: translateY(-20px); transition: all 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275); text-align: center; }
@@ -145,6 +158,8 @@
         <div class="main-play-zone">
             <div id="game-toast-layer"></div>
             <div id="initiative-badge">👑 주도권: 없음</div>
+            <div id="enemy-hand-display"><div class="enemy-hand-title">상대 손패</div><div class="enemy-hand-empty">비어있음</div></div>
+            <div id="turn-banner"><div id="turn-banner-text">⚔️ 내 턴입니다!</div></div>
             <div class="board-zone">
                 <svg id="hex-board" viewBox="0 0 660 580">
                     <defs>
@@ -206,6 +221,28 @@
     let isMyTurn = (myTeam === currentTurnTeam);
     let initiativeHolder = null; // 왕국 토큰으로 확보한 '다음 선공권' 보유 팀 (null이면 일반 교대) - 오직 확보한 본인 클라이언트의 턴 종료 로직에서만 사용됨
     let initiativeDisplay = null; // 우측 상단 표시 전용 (양쪽 클라이언트에 동기화됨, 게임 로직에는 영향 없음)
+
+    let enemyHandArray = []; // 상대방의 현재 손패 (실시간 동기화 표시용)
+
+    // 유닛 설명(툴팁용) + 전체 개수가 4개로 제한되는 유닛 목록 (주머니 2 + 징집소 2 = 4)
+    const UNIT_INFO = {
+        '파이크병': { desc: '자신을 근거리에서 공격한 상대에게 반격하여 함께 죽습니다.', limited: true },
+        '방패병':   { desc: '궁수나 석궁사수의 모든 화살 공격을 무시합니다.', limited: false },
+        '군기':     { desc: '자신 주변 1칸 내에 있는 아군에게 기본 공격/이동 1가지를 지시합니다.', limited: false },
+        '기마병':   { desc: '한 칸 이동 후 공격할 수 있습니다.', limited: true },
+        '궁수':     { desc: '두 칸 거리의 상대를 공격할 수 있지만, 근접 공격은 불가능합니다.', limited: true },
+        '정찰병':   { desc: '본진이 아니라 아군이 이미 점령해둔 거점에서 시작할 수 있습니다.', limited: false },
+        '석궁사수': { desc: '일직선 방향으로 최대 2칸까지 적을 저격합니다. (중간에 유닛이 있으면 2칸 저격 불가)', limited: false },
+        '검사':     { desc: '적을 공격하면 1칸을 이동할 수 있습니다.', limited: false },
+        '마법사':   { desc: '2칸 거리 내의 아군과 위치를 서로 바꿀 수 있습니다.', limited: false },
+        '기사':     { desc: '강화되지 않은(1개) 적에게는 공격받지 않습니다.', limited: true }
+    };
+    function getSupplyCountFor(unitName) {
+        return (UNIT_INFO[unitName] && UNIT_INFO[unitName].limited) ? 2 : 3;
+    }
+    function getUnitDesc(unitName) {
+        return (UNIT_INFO[unitName] && UNIT_INFO[unitName].desc) || '';
+    }
     let gameEnded = false; // 승패가 이미 결정되었는지 여부 (중복 판정 방지)
     
     console.log(`[내 접속 정보] 방 번호: ${roomId}, 내 팀: ${myTeam}, 내 턴 여부: ${isMyTurn}`);
@@ -245,6 +282,9 @@
                 updateInitiativeUI();
             }
             updateTurnStatusUI();
+        } else if (data.action === 'handUpdate') {
+            enemyHandArray = data.hand || [];
+            renderEnemyHand();
         }
     });
 
@@ -284,6 +324,10 @@
                 // 방패병: 화살 공격 완전 무효화 (양쪽 다 변화 없음)
                 if (tgt.unit === '방패병' && attackType === '화살공격') {
                     showGameToast('🛡️ 방패병이 화살 공격을 막아냈습니다!');
+                }
+                // 기사: 강화되지 않은(스택 1) 적에게는 공격받지 않음
+                else if (tgt.unit === '기사' && src && src.stack < 2) {
+                    showGameToast('🐴 기사를 공격하기에는 너무 나약합니다!');
                 } else {
                     // 파이크병 근접 반격: 공격자도 함께 전사
                     if (tgt.unit === '파이크병' && attackType === '근접' && src) {
@@ -303,6 +347,15 @@
             const hex = hexGridData.find(h => h.id === hexId);
             if (hex) hex.baseOwner = team;
             checkWinCondition();
+        }
+        else if (subAction === '교환') {
+            const src = hexGridData.find(h => h.id === sourceHexId);
+            const tgt = hexGridData.find(h => h.id === targetHexId);
+            if (src && tgt) {
+                const tempUnit = tgt.unit, tempOwner = tgt.unitOwner, tempImg = tgt.img, tempStack = tgt.stack;
+                tgt.unit = src.unit; tgt.unitOwner = src.unitOwner; tgt.img = src.img; tgt.stack = src.stack;
+                src.unit = tempUnit; src.unitOwner = tempOwner; src.img = tempImg; src.stack = tempStack;
+            }
         }
         else if (subAction === '주도권') {
             const teamLabel = team === 'blue' ? '🔵 파란팀' : '🔴 빨간팀';
@@ -425,7 +478,7 @@
 
         window.onload = () => {
             // 내 진영이 blue든 red든 항상 '내가 뽑은 유닛'이 내 징집소(supply)로 들어가야 함
-            myPickedUnits.forEach(char => { supplyData[char.name] = { count: 3, img: char.img }; });
+            myPickedUnits.forEach(char => { supplyData[char.name] = { count: getSupplyCountFor(char.name), img: char.img }; });
 
             renderFlatHexBoard(); renderEnemyUnits(); renderSupply(); updatePileUI(); runOpeningSequence();
         };
@@ -438,7 +491,7 @@
                 if(supplyData[name].count > 0) {
                     hasTokens = true;
                     container.innerHTML += `
-                        <div style="display:flex; flex-direction:column; align-items:center; font-size:10px; color:#fff;">
+                        <div title="${name}: ${getUnitDesc(name)}" style="display:flex; flex-direction:column; align-items:center; font-size:10px; color:#fff; cursor:help;">
                             <img src="${supplyData[name].img}" style="width:26px; height:26px; border-radius:50%; border:2px solid #10b981; object-fit:cover;" onerror="this.style.display='none'">
                             <span style="background:#10b981; padding:0 4px; border-radius:4px; margin-top:2px;">${supplyData[name].count}</span>
                         </div>
@@ -544,6 +597,17 @@
         }
 
         function getAdjacentEmptyHexes(centerHex) { return getAdjacentHexes(centerHex).filter(h => !h.unit); }
+
+        // 마법사: 2칸 거리 이내(인접 1칸 + 정확히 2칸 거리) 전부를 합친 범위
+        function getHexesWithinRange2(centerHex) {
+            const combined = [...getAdjacentHexes(centerHex), ...getHexesAtDistance2(centerHex)];
+            const seen = new Set();
+            return combined.filter(h => {
+                if (seen.has(h.id)) return false;
+                seen.add(h.id);
+                return true;
+            });
+        }
 
         function renderFlatHexBoard() {
             const group = document.getElementById('hex-grid-group');
@@ -732,8 +796,8 @@
 
                     socket.emit('gameAction', { roomId, actionData: { action: 'executeAction', subAction: action, sourceHexId, targetHexId, token, team: myTeam } });
 
-                    // 🐴 기마병 특수 능력 Check: 이동 후 주변에 적이 있으면 추가 공격 연계
-                    if (token.name === '기마병') {
+                    // 🐴 기마병 특수 능력 Check: 이동 후 주변에 적이 있으면 추가 공격 연계 (군기 지시로 움직인 경우는 제외)
+                    if (action === '이동' && token.name === '기마병') {
                         const adjEnemies = getAdjacentHexes(targetHex).filter(h => h.unit && h.unitOwner !== myTeam);
                         if (adjEnemies.length > 0) {
                             followUpContext = { unitHexId: targetHex.id, targets: adjEnemies.map(e => ({ hexId: e.id, sourceId: targetHex.id, attackType: '근접' })) };
@@ -757,6 +821,11 @@
                 // 방패병 능력: 화살 공격(궁수/석궁 사수)을 전부 무력화
                 if (targetHex.unit === '방패병' && attackType === '화살공격') {
                     showGameToast('🛡️ 방패병이 화살 공격을 막아냈습니다!');
+                    blocked = true;
+                }
+                // 기사 능력: 강화되지 않은(스택 1) 적에게는 공격받지 않음
+                else if (targetHex.unit === '기사' && sourceHex.stack < 2) {
+                    showGameToast('🐴 기사를 공격하기에는 너무 나약합니다!');
                     blocked = true;
                 } else {
                     // 파이크병 근접 반격
@@ -782,8 +851,8 @@
 
                     socket.emit('gameAction', { roomId, actionData: { action: 'executeAction', subAction: action, sourceHexId, targetHexId, token, team: myTeam, attackType, blocked } });
 
-                    // ⚔️ 검사 특수 능력 Check: 공격 후 이동 가능한 빈 칸이 있으면 추가 이동 연계
-                    if (token.name === '검사' && sourceHex.unit === '검사') {
+                    // ⚔️ 검사 특수 능력 Check: 공격 후 이동 가능한 빈 칸이 있으면 추가 이동 연계 (군기 지시로 공격한 경우는 제외)
+                    if (action === '공격' && token.name === '검사' && sourceHex.unit === '검사') {
                         const emptyAdj = getAdjacentEmptyHexes(sourceHex);
                         if (emptyAdj.length > 0) {
                             followUpContext = { unitHexId: sourceHex.id, targets: emptyAdj.map(e => ({ hexId: e.id, sourceId: sourceHex.id })) };
@@ -808,6 +877,21 @@
                 socket.emit('gameAction', { roomId, actionData: { action: 'executeAction', subAction: '점령', hexId: targetHexId, token, team: myTeam } });
                 checkWinCondition();
             }
+            else if (action === '교환') {
+                const sourceHex = hexGridData.find(h => h.id === sourceHexId);
+                const tempUnit = targetHex.unit, tempOwner = targetHex.unitOwner, tempImg = targetHex.img, tempStack = targetHex.stack;
+
+                targetHex.unit = sourceHex.unit; targetHex.unitOwner = sourceHex.unitOwner;
+                targetHex.img = sourceHex.img; targetHex.stack = sourceHex.stack;
+
+                sourceHex.unit = tempUnit; sourceHex.unitOwner = tempOwner;
+                sourceHex.img = tempImg; sourceHex.stack = tempStack;
+
+                const usedToken = handArray.splice(tokenIndex, 1)[0];
+                discardArray.push(usedToken);
+
+                socket.emit('gameAction', { roomId, actionData: { action: 'executeAction', subAction: '교환', sourceHexId, targetHexId, token, team: myTeam } });
+            }
 
             updatePileUI(); currentActionContext = null; followUpContext = null; activeMenuIndex = -1; renderFlatHexBoard(); renderPlayerHand();
             checkTurnEnd();
@@ -819,7 +903,7 @@
             const enemyPickedUnits = (myTeam === 'blue') ? redPicked : bluePicked;
             enemyPickedUnits.forEach(unit => {
                 container.innerHTML += `
-                    <div class="enemy-token-card">
+                    <div class="enemy-token-card" title="${unit.name}: ${getUnitDesc(unit.name)}" style="cursor:help;">
                         <div class="enemy-token-mini"><img src="${unit.img || 'images/sword.jpg'}" onerror="this.style.display='none'"></div>
                         <div class="enemy-token-name">${unit.name}</div>
                     </div>`;
@@ -984,6 +1068,7 @@
         }
         
         // [신규 추가] UI 상단에 현재 턴 상태 표시 (팀 색상 및 상태)
+        let lastKnownIsMyTurn = null; // 턴 전환 애니메이션 중복 방지용
         function updateTurnStatusUI() {
             isMyTurn = (myTeam === currentTurnTeam);
             const badge = document.querySelector('.turn-status-box span');
@@ -998,6 +1083,19 @@
                     badge.innerText = `상대방 턴 대기중...`;
                 }
             }
+
+            // 상대 턴 -> 내 턴으로 막 바뀐 순간에만 큰 배너를 잠깐 띄움
+            if (isMyTurn && lastKnownIsMyTurn === false) {
+                showTurnBanner();
+            }
+            lastKnownIsMyTurn = isMyTurn;
+        }
+
+        function showTurnBanner() {
+            const banner = document.getElementById('turn-banner');
+            if (!banner) return;
+            banner.classList.add('show');
+            setTimeout(() => banner.classList.remove('show'), 1400);
         }
         updateTurnStatusUI();
 
@@ -1039,18 +1137,8 @@
         function openCommandModal(allyHexId, tokenIndex, token) {
             const allyHex = hexGridData.find(h => h.id === allyHexId);
             const canMove = getAdjacentEmptyHexes(allyHex).length > 0;
-            let canAttack = false;
-            
-            if (allyHex.unit !== '궁수') {
-                if (getAdjacentHexes(allyHex).some(h => h.unit && h.unitOwner !== myTeam)) canAttack = true;
-            }
-            
-            if (allyHex.unit === '석궁사수') {
-                if (getStraightLineHexesAtDistance2(allyHex).some(h => h.unit && h.unitOwner !== myTeam)) canAttack = true;
-            }
-            else if (allyHex.unit === '궁수') {
-                if (getHexesAtDistance2(allyHex).some(h => h.unit && h.unitOwner !== myTeam)) canAttack = true;
-            }
+            // 군기의 지시는 유닛의 특수 능력과 무관하게 항상 '기본 공격(인접 1칸)'만 가능
+            const canAttack = getAdjacentHexes(allyHex).some(h => h.unit && h.unitOwner !== myTeam);
 
             document.getElementById('command-modal-title').innerText = `🚩 [${allyHex.unit}] 행동 지시`;
             document.getElementById('btn-command-move').style.display = canMove ? 'block' : 'none';
@@ -1073,26 +1161,10 @@
                 const targets = getAdjacentEmptyHexes(allyHex).map(t => ({ hexId: t.id, sourceId: allyHex.id }));
                 currentActionContext = { action: '지시_이동', tokenIndex, token, targets };
             } else if (type === 'attack') {
-                let targets = [];
-                
-                if (allyHex.unit !== '궁수') {
-                    getAdjacentHexes(allyHex).filter(h => h.unit && h.unitOwner !== myTeam).forEach(t => targets.push({ hexId: t.id, sourceId: allyHex.id, attackType: '근접' }));
-                }
-                
-                if (allyHex.unit === '석궁사수') {
-                    getStraightLineHexesAtDistance2(allyHex).filter(h => h.unit && h.unitOwner !== myTeam).forEach(t => {
-                        if (!targets.some(tgt => tgt.hexId === t.id && tgt.sourceId === allyHex.id)) {
-                            targets.push({ hexId: t.id, sourceId: allyHex.id, attackType: '화살공격' });
-                        }
-                    });
-                }
-                else if (allyHex.unit === '궁수') {
-                    getHexesAtDistance2(allyHex).filter(h => h.unit && h.unitOwner !== myTeam).forEach(t => {
-                        if (!targets.some(tgt => tgt.hexId === t.id && tgt.sourceId === allyHex.id)) {
-                            targets.push({ hexId: t.id, sourceId: allyHex.id, attackType: '화살공격' });
-                        }
-                    });
-                }
+                // 군기의 지시는 항상 기본 공격(인접 1칸, 근접 판정)으로만 처리 - 궁수/석궁사수의 원거리 능력은 적용되지 않음
+                const targets = getAdjacentHexes(allyHex)
+                    .filter(h => h.unit && h.unitOwner !== myTeam)
+                    .map(t => ({ hexId: t.id, sourceId: allyHex.id, attackType: '근접' }));
 
                 currentActionContext = { action: '지시_공격', tokenIndex, token, targets };
             }
@@ -1208,7 +1280,7 @@
         const myUnits = hexGridData.filter(h => h.unit === token.name && h.unitOwner === myTeam);
         let targets = [];
         myUnits.forEach(u => {
-            // 궁수/석궁사수는 근접 공격이 불가능하고 오직 원거리 사격만 가능
+            // 궁수는 근접 공격이 불가능하고 오직 2칸 원거리 사격만 가능
             if (token.name !== '궁수' && token.name !== '석궁사수') {
                 getAdjacentHexes(u).filter(h => h.unit !== null && h.unitOwner !== myTeam).forEach(t => {
                     targets.push({ hexId: t.id, sourceId: u.id, attackType: '근접' });
@@ -1223,8 +1295,13 @@
                 });
             }
 
-            // 석궁사수: 일직선 방향으로 정확히 2칸 거리 저격 (중간에 다른 유닛이 있으면 불가)
+            // 석궁사수: "최대 2칸까지" = 인접 1칸 + 직선 2칸(중간에 유닛 있으면 2칸 저격은 불가) 모두 화살 공격으로 처리
             if (token.name === '석궁사수') {
+                getAdjacentHexes(u).filter(h => h.unit !== null && h.unitOwner !== myTeam).forEach(t => {
+                    if (!targets.some(x => x.hexId === t.id && x.sourceId === u.id)) {
+                        targets.push({ hexId: t.id, sourceId: u.id, attackType: '화살공격' });
+                    }
+                });
                 getStraightLineHexesAtDistance2(u).filter(h => h.unit !== null && h.unitOwner !== myTeam).forEach(t => {
                     if (!targets.some(x => x.hexId === t.id && x.sourceId === u.id)) {
                         targets.push({ hexId: t.id, sourceId: u.id, attackType: '화살공격' });
@@ -1237,8 +1314,20 @@
 
     // 8. 점령 행동 처리
     else if (actionName === '점령') {
-        const myUnits = hexGridData.filter(h => h.unit === token.name && h.unitOwner === myTeam && (h.type === 'control' || h.type === 'red-base' || h.type === 'blue-base') && h.baseOwner !== myTeam);
+        const myUnits = hexGridData.filter(h => h.unit === token.name && h.unitOwner === myTeam && h.type === 'control' && h.baseOwner !== myTeam);
         if (myUnits.length > 0) currentActionContext = { action: '점령', tokenIndex, token, targets: myUnits.map(h => ({ hexId: h.id })) };
+    }
+
+    // 8-1. 마법사: 위치 교환 행동 처리 (2칸 거리 이내의 아군과 자리를 바꿈)
+    else if (actionName === '교환') {
+        const myWizards = hexGridData.filter(h => h.unit === token.name && h.unitOwner === myTeam);
+        let targets = [];
+        myWizards.forEach(w => {
+            getHexesWithinRange2(w).filter(h => h.unit !== null && h.unitOwner === myTeam).forEach(t => {
+                targets.push({ hexId: t.id, sourceId: w.id });
+            });
+        });
+        if (targets.length > 0) currentActionContext = { action: '교환', tokenIndex, token, targets };
     }
 
     // 9. 지시 행동 처리
@@ -1258,9 +1347,36 @@
     if (typeof renderFlatHexBoard === 'function') renderFlatHexBoard();
 }
 
+        // 내 손패 상태를 상대에게 실시간으로 알려줌 (좌측 상단 상대 손패 표시용)
+        function broadcastHandState() {
+            const simplified = handArray.map(t => ({ isRoyal: !!t.isRoyal, name: t.name, img: t.img }));
+            socket.emit('gameAction', { roomId, actionData: { action: 'handUpdate', hand: simplified, team: myTeam } });
+        }
+
+        // 상대의 손패를 보드 좌측 상단에 작게 표시
+        function renderEnemyHand() {
+            const container = document.getElementById('enemy-hand-display');
+            if (!container) return;
+            if (!enemyHandArray || enemyHandArray.length === 0) {
+                container.innerHTML = `<div class="enemy-hand-title">상대 손패</div><div class="enemy-hand-empty">비어있음</div>`;
+                return;
+            }
+            let html = `<div class="enemy-hand-title">상대 손패 (${enemyHandArray.length})</div><div class="enemy-hand-tokens">`;
+            enemyHandArray.forEach(token => {
+                if (token.isRoyal) {
+                    html += `<div class="enemy-hand-token" title="왕국 토큰">${enemyTeam === 'blue' ? '🔵' : '🔴'}</div>`;
+                } else {
+                    html += `<div class="enemy-hand-token" title="${token.name}"><img src="${token.img}" onerror="this.style.display='none'"></div>`;
+                }
+            });
+            html += `</div>`;
+            container.innerHTML = html;
+        }
+
         function renderPlayerHand() {
             const handContainer = document.getElementById('player-hand-container');
             handContainer.innerHTML = '<div class="hand-zone-title">이번 라운드 손패</div>';
+            broadcastHandState();
             if (handArray.length === 0) { handContainer.innerHTML += `<div class="hand-slot-hint" id="hand-hint">주머니를 눌러 토큰을 뽑으세요!</div>`; return; }
 
             handArray.forEach((token, index) => {
@@ -1287,17 +1403,18 @@
                     else {
                         const myUnits = hexGridData.filter(h => h.unit === token.name && h.unitOwner === myTeam);
                         const isOnBoard = myUnits.length > 0;
-                        let canMove = false; let canAttack = false; let canCommand = false;
+                        let canMove = false; let canAttack = false; let canCommand = false; let canSwap = false;
 
                         if (isOnBoard) {
                             myUnits.forEach(u => {
                                 if (getAdjacentEmptyHexes(u).length > 0) canMove = true;
                                 
-                                if (token.name !== '궁수') {
+                                if (token.name !== '궁수' && token.name !== '석궁사수') {
                                     if (getAdjacentHexes(u).some(h => h.unit && h.unitOwner !== myTeam)) canAttack = true;
                                 }
                                 
                                 if (token.name === '석궁사수') {
+                                    if (getAdjacentHexes(u).some(h => h.unit && h.unitOwner !== myTeam)) canAttack = true;
                                     if (getStraightLineHexesAtDistance2(u).some(h => h.unit && h.unitOwner !== myTeam)) canAttack = true;
                                 }
                                 else if (token.name === '궁수') {
@@ -1307,6 +1424,10 @@
                                 if (token.name === '군기') {
                                     if (getAdjacentHexes(u).some(h => h.unit && h.unitOwner === myTeam)) canCommand = true;
                                 }
+
+                                if (token.name === '마법사') {
+                                    if (getHexesWithinRange2(u).some(h => h.unit && h.unitOwner === myTeam)) canSwap = true;
+                                }
                             });
                         }
                         
@@ -1315,7 +1436,7 @@
                             ? hexGridData.filter(h => h.baseOwner === myTeam && h.unit === null)
                             : hexGridData.filter(h => h.type === (myTeam + '-base') && h.baseOwner === myTeam && h.unit === null);
                         const canDeploy = !isOnBoard && emptyMainBases.length > 0;
-                        const canControl = isOnBoard && myUnits.some(h => (h.type === 'control' || h.type === 'red-base' || h.type === 'blue-base') && h.baseOwner !== myTeam);
+                        const canControl = isOnBoard && myUnits.some(h => h.type === 'control' && h.baseOwner !== myTeam);
                         const hasSupply = supplyData[token.name] && supplyData[token.name].count > 0;
                         const canRecruit = !isOnBoard && !canDeploy && hasSupply;
 
@@ -1323,6 +1444,7 @@
                         if (canAttack) actions.push('공격');
                         if (canReinforce) actions.push('강화');
                         if (canCommand) actions.push('지시');
+                        if (canSwap) actions.push('교환');
                         if (canDeploy) actions.push('배치');
                         if (canControl) actions.push('점령');
                         if (canRecruit) actions.push('징집'); 
@@ -1331,7 +1453,7 @@
 
                     actions.forEach(action => {
                         const btn = document.createElement('button');
-                        btn.className = `action-btn ${action === '징집' ? 'recruit' : ''} ${action === '강화' ? 'reinforce' : ''} ${action === '이동' ? 'move' : ''} ${action === '공격' ? 'attack' : ''} ${action === '점령' ? 'control' : ''} ${action === '지시' ? 'command-ability' : ''} ${action === '패스' ? 'pass' : ''}`;
+                        btn.className = `action-btn ${action === '징집' ? 'recruit' : ''} ${action === '강화' ? 'reinforce' : ''} ${action === '이동' ? 'move' : ''} ${action === '공격' ? 'attack' : ''} ${action === '점령' ? 'control' : ''} ${action === '지시' ? 'command-ability' : ''} ${action === '교환' ? 'command-ability' : ''} ${action === '패스' ? 'pass' : ''}`;
                         btn.innerText = action; btn.onclick = (e) => { e.stopPropagation(); executeAction(action, index, token); };
                         menu.appendChild(btn);
                     });
