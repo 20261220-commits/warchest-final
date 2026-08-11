@@ -36,6 +36,19 @@
                <input type="text" id="room-id" placeholder="생성시 비워두세요" maxlength="6">
            </div>
 
+           <div class="input-group">
+               <label>게임 모드 (방 만들기 시 적용됩니다)</label>
+               <div class="mode-select-group">
+                   <div class="mode-card selected" id="mode-card-fast" data-mode="fast">
+                       <div class="mode-card-title">⚡ 패스트 듀얼</div>
+                       <div class="mode-card-desc">소형 보드 · 거점 3곳 선점 승리</div>
+                   </div>
+                   <div class="mode-card" id="mode-card-grand" data-mode="grand">
+                       <div class="mode-card-title">🏰 그랜드 워체스트</div>
+                       <div class="mode-card-desc">한 변 4칸 정육각형 판 · 팀당 기지 2개 · 거점 6곳 중 4곳 선점 승리</div>
+                   </div>
+               </div>
+           </div>
 
            <div class="lobby-buttons">
                <button id="btn-create" class="btn btn-blue">방 만들기</button>
@@ -48,6 +61,7 @@
            <div class="room-header">
                <h2>게임 대기실</h2>
                <div class="room-id-badge">ROOM ID : <span id="display-room-id">------</span></div>
+               <div><span class="mode-badge" id="display-room-mode">⚡ 패스트 듀얼</span></div>
            </div>
           
            <div class="room-players">
@@ -193,6 +207,17 @@
        let myTeam = null;
        let currentRoomId = null;
        let myName = "";
+       let selectedMode = 'fast'; // 방 만들기 시 적용되는 게임 모드 (fast | grand)
+       let currentRoomMode = 'fast'; // 실제로 이 방에 적용된 모드 (참여자는 이걸로 따라감)
+
+
+       document.querySelectorAll('.mode-card').forEach(card => {
+           card.addEventListener('click', () => {
+               document.querySelectorAll('.mode-card').forEach(c => c.classList.remove('selected'));
+               card.classList.add('selected');
+               selectedMode = card.getAttribute('data-mode');
+           });
+       });
 
 
        btnStart.addEventListener('click', () => {
@@ -224,8 +249,8 @@
            }
 
 
-           // 서버에 입장 요청
-           socket.emit('joinRoom', { roomId: currentRoomId, userName: myName });
+           // 서버에 입장 요청 (모드는 방을 새로 만들 때만 의미가 있고, 참여 시에는 서버가 이미 저장된 값을 그대로 씀)
+           socket.emit('joinRoom', { roomId: currentRoomId, userName: myName, mode: selectedMode });
        };
 
 
@@ -240,6 +265,10 @@
 
 
            document.getElementById('display-room-id').innerText = room.roomId;
+
+           currentRoomMode = room.mode || 'fast';
+           const modeLabel = document.getElementById('display-room-mode');
+           if (modeLabel) modeLabel.innerText = currentRoomMode === 'grand' ? '🏰 그랜드 워체스트' : '⚡ 패스트 듀얼';
 
 
            const p1 = room.players.find(p => p.team === 'blue');
@@ -455,11 +484,11 @@
                indicator.className = "turn-badge btn-yellow";
 
 
-               // URL Query String으로 방 번호(room)와 팀(team) 정보를 함께 전달
+               // URL Query String으로 방 번호(room)와 팀(team), 게임 모드(mode) 정보를 함께 전달
                setTimeout(() => {
                    sessionStorage.setItem('bluePicked', JSON.stringify(bluePicked));
                    sessionStorage.setItem('redPicked', JSON.stringify(redPicked));
-                   window.location.href = `game.html?room=${currentRoomId}&team=${myTeam}`;
+                   window.location.href = `game.html?room=${currentRoomId}&team=${myTeam}&mode=${currentRoomMode}`;
                }, 1800);
            }
        }

@@ -7,7 +7,7 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
 
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, '/')));
 
 const rooms = {};
 const disconnectTimers = {}; // key: `${roomId}:${team}` -> setTimeout handle (재접속 유예 타이머)
@@ -16,14 +16,15 @@ io.on('connection', (socket) => {
     console.log(`플레이어 접속: ${socket.id}`);
 
     // 1. 방 참가 / 생성 처리
-    socket.on('joinRoom', ({ roomId, userName }) => {
+    socket.on('joinRoom', ({ roomId, userName, mode }) => {
         socket.join(roomId);
 
         if (!rooms[roomId]) {
             rooms[roomId] = {
                 roomId,
                 players: [],
-                gameState: null
+                gameState: null,
+                mode: (mode === 'grand') ? 'grand' : 'fast' // 방을 처음 만든 사람이 정한 모드로 고정됨
             };
         }
 

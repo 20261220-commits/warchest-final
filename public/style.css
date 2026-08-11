@@ -91,6 +91,15 @@ body {
 .input-group input:focus { background-color: #ffffff; border-color: #ffe082; }
 .lobby-buttons { width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 20px; }
 
+.mode-select-group { display: flex; flex-direction: column; gap: 10px; }
+.mode-card { border: 2px solid #3c4043; border-radius: 14px; padding: 12px 16px; cursor: pointer; background-color: #fafafa; transition: all 0.2s ease; }
+.mode-card:hover { background-color: #fff3d6; }
+.mode-card.selected { background-color: #ffe082; box-shadow: 0 4px 0 #3c4043; }
+.mode-card-title { font-weight: 700; font-size: 1rem; color: #3c4043; margin-bottom: 4px; }
+.mode-card-desc { font-size: 0.8rem; color: #80868b; }
+.mode-card.selected .mode-card-desc { color: #6b5c1f; }
+.mode-badge { display: inline-block; background-color: #fff3d6; color: #7a5c00; border: 2px solid #3c4043; padding: 4px 14px; border-radius: 10px; font-weight: 700; font-size: 0.85rem; margin-top: 8px; }
+
 /* 대기실 */
 .room-header { margin-bottom: 30px; }
 .room-id-badge { display: inline-block; background-color: #ffe082; color: #3c4043; border: 2px solid #3c4043; padding: 6px 18px; border-radius: 12px; font-weight: 700; font-size: 0.95rem; margin-top: 8px; }

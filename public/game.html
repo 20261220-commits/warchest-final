@@ -367,31 +367,89 @@
 
         renderFlatHexBoard();
     }
-        const hexGridData = [
-            { id: 0, c: 0, r: 0, type: 'control', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 }, 
-            { id: 1, c: 0, r: 1, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
-            { id: 2, c: 1, r: 0, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },  
-            { id: 3, c: 1, r: 1, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 }, 
-            { id: 4, c: 1, r: 2, type: 'control', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
-            { id: 5, c: 2, r: 0, type: 'red-base', baseOwner: 'red', unit: null, unitOwner: null, img: null, stack: 0 }, 
-            { id: 6, c: 2, r: 1, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 }, 
-            { id: 7, c: 2, r: 2, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 }, 
-            { id: 8, c: 2, r: 3, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
-            { id: 9, c: 3, r: 0, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },  
-            { id: 10, c: 3, r: 1, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 }, 
-            { id: 11, c: 3, r: 2, type: 'control', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 }, 
-            { id: 12, c: 3, r: 3, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 }, 
-            { id: 13, c: 3, r: 4, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
-            { id: 14, c: 4, r: 0, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },  
-            { id: 15, c: 4, r: 1, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 }, 
-            { id: 16, c: 4, r: 2, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 }, 
-            { id: 17, c: 4, r: 3, type: 'blue-base', baseOwner: 'blue', unit: null, unitOwner: null, img: null, stack: 0 }, 
-            { id: 18, c: 5, r: 0, type: 'control', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 }, 
-            { id: 19, c: 5, r: 1, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 }, 
-            { id: 20, c: 5, r: 2, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
-            { id: 21, c: 6, r: 0, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },  
-            { id: 22, c: 6, r: 1, type: 'control', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 }
-        ];
+        // -------------------------------------------------------------
+        // 게임 모드별 보드 설정 (패스트 듀얼 / 그랜드 워체스트)
+        // -------------------------------------------------------------
+        const BOARD_CONFIGS = {
+            fast: {
+                winThreshold: 3,
+                viewBoxW: 660, viewBoxH: 580,
+                hexData: [
+                    { id: 0, c: 0, r: 0, type: 'control', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 1, c: 0, r: 1, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 2, c: 1, r: 0, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 3, c: 1, r: 1, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 4, c: 1, r: 2, type: 'control', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 5, c: 2, r: 0, type: 'red-base', baseOwner: 'red', unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 6, c: 2, r: 1, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 7, c: 2, r: 2, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 8, c: 2, r: 3, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 9, c: 3, r: 0, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 10, c: 3, r: 1, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 11, c: 3, r: 2, type: 'control', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 12, c: 3, r: 3, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 13, c: 3, r: 4, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 14, c: 4, r: 0, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 15, c: 4, r: 1, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 16, c: 4, r: 2, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 17, c: 4, r: 3, type: 'blue-base', baseOwner: 'blue', unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 18, c: 5, r: 0, type: 'control', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 19, c: 5, r: 1, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 20, c: 5, r: 2, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 21, c: 6, r: 0, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 22, c: 6, r: 1, type: 'control', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 }
+                ]
+            },
+            // 그랜드 워체스트: 한 변이 4칸인 정육각형 판(37칸), 팀당 기지 2개, 거점 6개 중 4개 선점 승리
+            grand: {
+                winThreshold: 4,
+                viewBoxW: 600, viewBoxH: 700,
+                hexData: [
+                    { id: 0, c: 0, r: 0, type: 'blue-base', baseOwner: 'blue', unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 1, c: 0, r: 1, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 2, c: 0, r: 2, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 3, c: 0, r: 3, type: 'blue-base', baseOwner: 'blue', unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 4, c: 1, r: 0, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 5, c: 1, r: 1, type: 'control', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 6, c: 1, r: 2, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 7, c: 1, r: 3, type: 'control', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 8, c: 1, r: 4, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 9, c: 2, r: 0, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 10, c: 2, r: 1, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 11, c: 2, r: 2, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 12, c: 2, r: 3, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 13, c: 2, r: 4, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 14, c: 2, r: 5, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 15, c: 3, r: 0, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 16, c: 3, r: 1, type: 'control', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 17, c: 3, r: 2, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 18, c: 3, r: 3, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 19, c: 3, r: 4, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 20, c: 3, r: 5, type: 'control', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 21, c: 3, r: 6, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 22, c: 4, r: 0, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 23, c: 4, r: 1, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 24, c: 4, r: 2, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 25, c: 4, r: 3, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 26, c: 4, r: 4, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 27, c: 4, r: 5, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 28, c: 5, r: 0, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 29, c: 5, r: 1, type: 'control', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 30, c: 5, r: 2, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 31, c: 5, r: 3, type: 'control', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 32, c: 5, r: 4, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 33, c: 6, r: 0, type: 'red-base', baseOwner: 'red', unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 34, c: 6, r: 1, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 35, c: 6, r: 2, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 36, c: 6, r: 3, type: 'red-base', baseOwner: 'red', unit: null, unitOwner: null, img: null, stack: 0 }
+                ]
+            }
+        };
+
+        const gameMode = (urlParams.get('mode') === 'grand') ? 'grand' : 'fast';
+        const activeBoard = BOARD_CONFIGS[gameMode];
+        const winThreshold = activeBoard.winThreshold;
+        let hexGridData = activeBoard.hexData;
 
 
         let bagArray = []; discardArray = []; graveyardArray = []; handArray = [];       
@@ -477,6 +535,15 @@
         }
 
         window.onload = () => {
+            // 게임 모드에 맞는 보드 크기(viewBox) 적용
+            document.getElementById('hex-board').setAttribute('viewBox', `0 0 ${activeBoard.viewBoxW} ${activeBoard.viewBoxH}`);
+            const introTitleEl = document.getElementById('intro-title');
+            if (introTitleEl) {
+                introTitleEl.innerText = gameMode === 'grand'
+                    ? '🚩 6개의 거점 중 4개를 먼저 점령하세요!'
+                    : '🚩 3개의 거점을 먼저 점령하세요!';
+            }
+
             // 내 진영이 blue든 red든 항상 '내가 뽑은 유닛'이 내 징집소(supply)로 들어가야 함
             myPickedUnits.forEach(char => { supplyData[char.name] = { count: getSupplyCountFor(char.name), img: char.img }; });
 
@@ -536,9 +603,8 @@
                 // 빨간팀 화면에서는 보드를 180도 돌려서, 실제 마주 앉아 플레이하는 것처럼
                 // 자기 본진이 항상 화면 아래쪽/자기 쪽에 오도록 좌표를 뷰박스 중심 기준으로 반전한다.
                 // (유닛 이미지/텍스트 자체는 회전시키지 않고 배치 좌표만 반전하므로 그대로 똑바로 보임)
-                const viewBoxW = 660, viewBoxH = 580;
-                cx = viewBoxW - cx;
-                cy = viewBoxH - cy;
+                cx = activeBoard.viewBoxW - cx;
+                cy = activeBoard.viewBoxH - cy;
             }
 
             return { cx, cy };
@@ -719,8 +785,8 @@
             const redControl = hexGridData.filter(h => h.type === 'control' && h.baseOwner === 'red').length;
 
             let winnerTeam = null;
-            if (blueControl >= 3) winnerTeam = 'blue';
-            else if (redControl >= 3) winnerTeam = 'red';
+            if (blueControl >= winThreshold) winnerTeam = 'blue';
+            else if (redControl >= winThreshold) winnerTeam = 'red';
 
             if (winnerTeam) {
                 gameEnded = true;
