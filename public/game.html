@@ -76,6 +76,8 @@
         .action-btn.pass:hover { background: #9ca3af; }
         .action-btn.command-ability { background: #84cc16; color: white; }
         .action-btn.command-ability:hover { background: #a3e635; }
+        .action-btn.swap { background: #9333ea; color: white; }
+        .action-btn.swap:hover { background: #c084fc; }
         
         @keyframes popIn { 0% { opacity: 0; transform: scale(0.8) translateY(10px); } 100% { opacity: 1; transform: scale(1) translateY(0); } }
         #animation-layer { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: rgba(0, 0, 0, 0.85); z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; transition: opacity 0.6s ease; }
@@ -401,47 +403,49 @@
                 ]
             },
             // 그랜드 워체스트: 한 변이 4칸인 정육각형 판(37칸), 팀당 기지 2개, 거점 6개 중 4개 선점 승리
+            // 그랜드 워체스트: 한 변이 4칸인 정육각형 판(37칸, 가로로 넓은 배치), 팀당 기지 2개, 거점 6개 중 4개 선점 승리
             grand: {
                 winThreshold: 4,
-                viewBoxW: 600, viewBoxH: 700,
+                wide: true, // getHexCenter에서 가로로 넓은 축(axial) 좌표식을 쓰도록 표시
+                viewBoxW: 650, viewBoxH: 580,
                 hexData: [
-                    { id: 0, c: 0, r: 0, type: 'blue-base', baseOwner: 'blue', unit: null, unitOwner: null, img: null, stack: 0 },
-                    { id: 1, c: 0, r: 1, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
-                    { id: 2, c: 0, r: 2, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
-                    { id: 3, c: 0, r: 3, type: 'blue-base', baseOwner: 'blue', unit: null, unitOwner: null, img: null, stack: 0 },
-                    { id: 4, c: 1, r: 0, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
-                    { id: 5, c: 1, r: 1, type: 'control', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
-                    { id: 6, c: 1, r: 2, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
-                    { id: 7, c: 1, r: 3, type: 'control', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
-                    { id: 8, c: 1, r: 4, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
-                    { id: 9, c: 2, r: 0, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
-                    { id: 10, c: 2, r: 1, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
-                    { id: 11, c: 2, r: 2, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
-                    { id: 12, c: 2, r: 3, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
-                    { id: 13, c: 2, r: 4, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
-                    { id: 14, c: 2, r: 5, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
-                    { id: 15, c: 3, r: 0, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
-                    { id: 16, c: 3, r: 1, type: 'control', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
-                    { id: 17, c: 3, r: 2, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
-                    { id: 18, c: 3, r: 3, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
-                    { id: 19, c: 3, r: 4, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
-                    { id: 20, c: 3, r: 5, type: 'control', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
-                    { id: 21, c: 3, r: 6, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
-                    { id: 22, c: 4, r: 0, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
-                    { id: 23, c: 4, r: 1, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
-                    { id: 24, c: 4, r: 2, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
-                    { id: 25, c: 4, r: 3, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
-                    { id: 26, c: 4, r: 4, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
-                    { id: 27, c: 4, r: 5, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
-                    { id: 28, c: 5, r: 0, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
-                    { id: 29, c: 5, r: 1, type: 'control', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
-                    { id: 30, c: 5, r: 2, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
-                    { id: 31, c: 5, r: 3, type: 'control', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
-                    { id: 32, c: 5, r: 4, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
-                    { id: 33, c: 6, r: 0, type: 'red-base', baseOwner: 'red', unit: null, unitOwner: null, img: null, stack: 0 },
-                    { id: 34, c: 6, r: 1, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
-                    { id: 35, c: 6, r: 2, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
-                    { id: 36, c: 6, r: 3, type: 'red-base', baseOwner: 'red', unit: null, unitOwner: null, img: null, stack: 0 }
+                    { id: 0, c: -3, r: 0, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 1, c: -3, r: 1, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 2, c: -3, r: 2, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 3, c: -3, r: 3, type: 'red-base', baseOwner: 'red', unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 4, c: -2, r: -1, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 5, c: -2, r: 0, type: 'control', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 6, c: -2, r: 1, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 7, c: -2, r: 2, type: 'control', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 8, c: -2, r: 3, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 9, c: -1, r: -2, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 10, c: -1, r: -1, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 11, c: -1, r: 0, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 12, c: -1, r: 1, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 13, c: -1, r: 2, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 14, c: -1, r: 3, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 15, c: 0, r: -3, type: 'blue-base', baseOwner: 'blue', unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 16, c: 0, r: -2, type: 'control', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 17, c: 0, r: -1, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 18, c: 0, r: 0, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 19, c: 0, r: 1, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 20, c: 0, r: 2, type: 'control', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 21, c: 0, r: 3, type: 'red-base', baseOwner: 'red', unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 22, c: 1, r: -3, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 23, c: 1, r: -2, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 24, c: 1, r: -1, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 25, c: 1, r: 0, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 26, c: 1, r: 1, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 27, c: 1, r: 2, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 28, c: 2, r: -3, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 29, c: 2, r: -2, type: 'control', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 30, c: 2, r: -1, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 31, c: 2, r: 0, type: 'control', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 32, c: 2, r: 1, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 33, c: 3, r: -3, type: 'blue-base', baseOwner: 'blue', unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 34, c: 3, r: -2, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 35, c: 3, r: -1, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 },
+                    { id: 36, c: 3, r: 0, type: 'normal', baseOwner: null, unit: null, unitOwner: null, img: null, stack: 0 }
                 ]
             }
         };
@@ -594,10 +598,20 @@
         }
 
         function getHexCenter(hex) {
-            const startX = 40; const startY = 60; const hexH = 86.6; const colSpacing = 75;
-            const colShift = Math.abs(3 - hex.c) * (hexH / 2);
-            let cx = startX + (hex.c * colSpacing) + 47;
-            let cy = startY + colShift + (hex.r * hexH) + 43;
+            let cx, cy;
+
+            if (activeBoard.wide) {
+                // 그랜드 워체스트: 가로로 넓은 육각형(axial 좌표계) - 패스트 듀얼과 동일한 인접 간격(86.6)을 유지
+                const size = 50.0;
+                const offsetX = 324.8, offsetY = 290.0; // 전부 양수 좌표가 되도록 미리 계산해둔 오프셋
+                cx = size * Math.sqrt(3) * (hex.c + hex.r / 2) + offsetX;
+                cy = size * 1.5 * hex.r + offsetY;
+            } else {
+                const startX = 40; const startY = 60; const hexH = 86.6; const colSpacing = 75;
+                const colShift = Math.abs(3 - hex.c) * (hexH / 2);
+                cx = startX + (hex.c * colSpacing) + 47;
+                cy = startY + colShift + (hex.r * hexH) + 43;
+            }
 
             if (myTeam === 'red') {
                 // 빨간팀 화면에서는 보드를 180도 돌려서, 실제 마주 앉아 플레이하는 것처럼
@@ -748,6 +762,8 @@
                             dot.setAttribute('fill', '#ef4444'); dot.setAttribute('stroke', '#991b1b'); 
                         } else if (currentActionContext.action === '지시') {
                             dot.setAttribute('fill', '#84cc16'); dot.setAttribute('stroke', '#4d7c0f'); 
+                        } else if (currentActionContext.action === '교환') {
+                            dot.setAttribute('fill', '#9333ea'); dot.setAttribute('stroke', '#6b21a8');
                         } else {
                             dot.setAttribute('fill', '#10b981'); dot.setAttribute('stroke', '#047857'); 
                         }
@@ -1519,7 +1535,7 @@
 
                     actions.forEach(action => {
                         const btn = document.createElement('button');
-                        btn.className = `action-btn ${action === '징집' ? 'recruit' : ''} ${action === '강화' ? 'reinforce' : ''} ${action === '이동' ? 'move' : ''} ${action === '공격' ? 'attack' : ''} ${action === '점령' ? 'control' : ''} ${action === '지시' ? 'command-ability' : ''} ${action === '교환' ? 'command-ability' : ''} ${action === '패스' ? 'pass' : ''}`;
+                        btn.className = `action-btn ${action === '징집' ? 'recruit' : ''} ${action === '강화' ? 'reinforce' : ''} ${action === '이동' ? 'move' : ''} ${action === '공격' ? 'attack' : ''} ${action === '점령' ? 'control' : ''} ${action === '지시' ? 'command-ability' : ''} ${action === '교환' ? 'swap' : ''} ${action === '패스' ? 'pass' : ''}`;
                         btn.innerText = action; btn.onclick = (e) => { e.stopPropagation(); executeAction(action, index, token); };
                         menu.appendChild(btn);
                     });
