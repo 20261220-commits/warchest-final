@@ -78,6 +78,12 @@
         .action-btn.command-ability:hover { background: #a3e635; }
         .action-btn.swap { background: #9333ea; color: white; }
         .action-btn.swap:hover { background: #c084fc; }
+        .action-btn.necromancy { background: #27272a; color: white; }
+        .action-btn.necromancy:hover { background: #52525b; }
+        .action-btn.command-ranged { background: #c2410c; color: white; }
+        .action-btn.command-ranged:hover { background: #ea580c; }
+        .action-btn.catapult-attack { background: #78350f; color: white; }
+        .action-btn.catapult-attack:hover { background: #92400e; }
         
         @keyframes popIn { 0% { opacity: 0; transform: scale(0.8) translateY(10px); } 100% { opacity: 1; transform: scale(1) translateY(0); } }
         #animation-layer { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: rgba(0, 0, 0, 0.85); z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; transition: opacity 0.6s ease; }
@@ -237,7 +243,10 @@
         '석궁사수': { desc: '일직선 방향으로 최대 2칸까지 적을 저격합니다. (중간에 유닛이 있으면 2칸 저격 불가)', limited: false },
         '검사':     { desc: '적을 공격하면 1칸을 이동할 수 있습니다.', limited: false },
         '마법사':   { desc: '2칸 거리 내의 아군과 위치를 서로 바꿀 수 있습니다.', limited: false },
-        '기사':     { desc: '강화되지 않은(1개) 적에게는 공격받지 않습니다.', limited: true }
+        '기사':     { desc: '강화되지 않은(1개) 적에게는 공격받지 않습니다.', limited: true },
+        '네크로맨서': { desc: '강령술: 가장 최근에 죽은 아군을 그 위치에서 2턴 동안 되살립니다 (그동안 이동 불가).', limited: true },
+        '사령관':   { desc: '2칸 거리 내의 아군에게 공격을 지시합니다 (이동 불가, 대상 고유 능력 그대로 사용).', limited: true },
+        '투석병':   { desc: '2칸 거리의 적을 공격하면 그 주변 적에게도 피해를 줍니다 (근접 공격 불가).', limited: true }
     };
     function getSupplyCountFor(unitName) {
         return (UNIT_INFO[unitName] && UNIT_INFO[unitName].limited) ? 2 : 3;
@@ -246,6 +255,7 @@
         return (UNIT_INFO[unitName] && UNIT_INFO[unitName].desc) || '';
     }
     let gameEnded = false; // 승패가 이미 결정되었는지 여부 (중복 판정 방지)
+    let temporaryUnits = []; // 네크로맨서로 되살린 임시 유닛 목록: { hexId, team, unitName, turnsLeft }
     
     console.log(`[내 접속 정보] 방 번호: ${roomId}, 내 팀: ${myTeam}, 내 턴 여부: ${isMyTurn}`);
     
@@ -278,6 +288,8 @@
             applyRemoteAction(data);
         } else if (data.action === 'endTurn') {
             // 상대가 보낸 다음 차례 팀 정보를 그대로 신뢰 (왕국 토큰 주도권 확보 시 같은 팀이 연속으로 턴을 가질 수 있음)
+            const endingTeam = currentTurnTeam; // 턴이 바뀌기 직전, 방금 끝난 팀
+            decrementTempUnitsForTeam(endingTeam);
             currentTurnTeam = data.nextTeam || enemyTeam;
             if (data.initiativeConsumed) {
                 initiativeDisplay = null;
@@ -301,7 +313,7 @@
     // (보드 상태는 양쪽 클라이언트가 각자 hexGridData를 들고 있으므로, 상대가 검증까지 마친
     //  행동 결과를 동일하게 재현하기만 하면 된다 — 손패/주머니처럼 팀 전용 자원은 건드리지 않는다.)
     function applyRemoteAction(data) {
-        const { subAction, hexId, sourceHexId, targetHexId, token, team, attackType } = data;
+        const { subAction, hexId, sourceHexId, targetHexId, token, team, attackType, unitName, unitImg } = data;
 
         if (subAction === '배치') {
             const hex = hexGridData.find(h => h.id === hexId);
@@ -319,11 +331,11 @@
                 src.unit = null; src.unitOwner = null; src.img = null; src.stack = 0;
             }
         }
-        else if (subAction === '공격' || subAction === '지시_공격' || subAction === '기마병_연계공격') {
+        else if (subAction === '공격' || subAction === '지시_공격' || subAction === '기마병_연계공격' || subAction === '사령관_공격') {
             const src = hexGridData.find(h => h.id === sourceHexId);
             const tgt = hexGridData.find(h => h.id === targetHexId);
             if (tgt) {
-                // 방패병: 화살 공격 완전 무효화 (양쪽 다 변화 없음)
+                // 방패병: 화살 공격 완전 무효화 (투석병의 투석 공격은 막지 못함)
                 if (tgt.unit === '방패병' && attackType === '화살공격') {
                     showGameToast('🛡️ 방패병이 화살 공격을 막아냈습니다!');
                 }
@@ -334,13 +346,17 @@
                     // 파이크병 근접 반격: 공격자도 함께 전사
                     if (tgt.unit === '파이크병' && attackType === '근접' && src) {
                         showGameToast('🔱 파이크병이 반격했습니다!');
-                        graveyardArray.push({ isRoyal: false, name: src.unit, img: src.img });
-                        src.stack -= 1;
-                        if (src.stack <= 0) { src.unit = null; src.unitOwner = null; src.img = null; src.stack = 0; }
+                        removeUnitToGraveyard(src);
                     }
-                    graveyardArray.push({ isRoyal: false, name: tgt.unit, img: tgt.img });
-                    tgt.stack -= 1;
-                    if (tgt.stack <= 0) { tgt.unit = null; tgt.unitOwner = null; tgt.img = null; tgt.stack = 0; }
+                    removeUnitToGraveyard(tgt);
+
+                    // 투석병: 대상과 인접한 적에게도 splash 피해
+                    if (attackType === '투석공격') {
+                        getAdjacentHexes(tgt).filter(h => h.unit && h.unitOwner !== team).forEach(splashHex => {
+                            showGameToast('💥 투석 공격이 주변까지 휩쓸었습니다!');
+                            removeUnitToGraveyard(splashHex);
+                        });
+                    }
                     updatePileUI();
                 }
             }
@@ -364,6 +380,15 @@
             showGameToast(`👑 ${teamLabel}이 왕국 토큰으로 주도권을 확보했습니다!`);
             initiativeDisplay = team;
             updateInitiativeUI();
+        }
+        else if (subAction === '강령술') {
+            const hex = hexGridData.find(h => h.id === hexId);
+            if (hex) {
+                hex.unit = unitName; hex.unitOwner = team; hex.img = unitImg; hex.stack = 1;
+                temporaryUnits.push({ hexId: hex.id, team, unitName, turnsLeft: 2 });
+                const teamLabel = team === 'blue' ? '🔵 파란팀' : '🔴 빨간팀';
+                showGameToast(`💀 ${teamLabel}이 강령술로 ${unitName}의 영혼을 불러냈습니다!`);
+            }
         }
         // '패스' / '징집'은 상대의 개인 손패·주머니·징집소에만 영향을 주는 행동이라 내 화면엔 반영할 것이 없음
 
@@ -704,8 +729,11 @@
                 group.appendChild(useTag);
 
                 if (hex.unit) {
+                    const isSpirit = isTemporaryUnit(hex.id);
+
                     const unitGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
                     unitGroup.setAttribute('transform', `translate(${pos.cx - 25}, ${pos.cy - 25})`);
+                    if (isSpirit) unitGroup.setAttribute('opacity', '0.55'); // 강령술로 되살아난 임시 유닛은 영혼처럼 반투명하게 표시
 
                     const imgTag = document.createElementNS('http://www.w3.org/2000/svg', 'image');
                     imgTag.setAttribute('href', hex.img || '');
@@ -718,6 +746,7 @@
                     borderTag.setAttribute('r', '25'); borderTag.setAttribute('fill', 'none');
                     borderTag.setAttribute('stroke', hex.unitOwner === 'blue' ? '#3b82f6' : '#ef4444');
                     borderTag.setAttribute('stroke-width', '4');
+                    if (isSpirit) borderTag.setAttribute('stroke-dasharray', '5,4'); // 영혼 느낌의 점선 테두리
                     unitGroup.appendChild(borderTag);
                     
                     if (hex.stack > 1) {
@@ -747,9 +776,9 @@
                         const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
                         dot.setAttribute('cx', pos.cx); dot.setAttribute('cy', pos.cy); dot.setAttribute('r', '12'); 
                         
-                        if (currentActionContext.action === '공격' || currentActionContext.action === '지시_공격' || currentActionContext.action === '기마병_연계공격') {
+                        if (currentActionContext.action === '공격' || currentActionContext.action === '지시_공격' || currentActionContext.action === '기마병_연계공격' || currentActionContext.action === '사령관_공격') {
                             dot.setAttribute('fill', '#ef4444'); dot.setAttribute('stroke', '#991b1b'); 
-                        } else if (currentActionContext.action === '지시') {
+                        } else if (currentActionContext.action === '지시' || currentActionContext.action === '사령관_대상선택') {
                             dot.setAttribute('fill', '#84cc16'); dot.setAttribute('stroke', '#4d7c0f'); 
                         } else if (currentActionContext.action === '교환') {
                             dot.setAttribute('fill', '#9333ea'); dot.setAttribute('stroke', '#6b21a8');
@@ -784,6 +813,54 @@
         }
 
         // 거점(control) 3곳을 먼저 점령한 팀이 있는지 확인하고, 있으면 승패 연출을 띄운다.
+        // 유닛 한 대를 묘지로 보낸다 (스택이 0이 되면 완전히 제거). 네크로맨서 부활을 위해 팀/위치도 기록한다.
+        // 네크로맨서로 부활 중이라 이동이 묶여있는 유닛인지 확인
+        function isTemporaryUnit(hexId) {
+            return temporaryUnits.some(u => u.hexId === hexId);
+        }
+
+        // 부활 가능한 대상(우리 팀이 가장 최근에 잃은 유닛 중, 죽은 자리가 지금 비어있는 것)을 찾는다
+        function getReviveTarget() {
+            for (let i = graveyardArray.length - 1; i >= 0; i--) {
+                const g = graveyardArray[i];
+                if (g.isRoyal || g.team !== myTeam || g.hexId === undefined || g.hexId === null) continue;
+                const hex = hexGridData.find(h => h.id === g.hexId);
+                if (hex && hex.unit === null) return g;
+            }
+            return null;
+        }
+
+        // 특정 팀의 턴이 끝날 때마다 호출 - 그 팀의 임시 부활 유닛 남은 턴을 깎고, 다 되면 사라지게 함
+        function decrementTempUnitsForTeam(team) {
+            const stillAlive = [];
+            temporaryUnits.forEach(u => {
+                if (u.team !== team) { stillAlive.push(u); return; }
+                u.turnsLeft -= 1;
+                if (u.turnsLeft <= 0) {
+                    const hex = hexGridData.find(h => h.id === u.hexId);
+                    if (hex && hex.unit === u.unitName && hex.unitOwner === u.team) {
+                        hex.unit = null; hex.unitOwner = null; hex.img = null; hex.stack = 0;
+                        showGameToast(`💨 부활 효과가 끝나 ${u.unitName}이(가) 다시 사라졌습니다.`);
+                        renderFlatHexBoard();
+                    }
+                } else {
+                    stillAlive.push(u);
+                }
+            });
+            temporaryUnits = stillAlive;
+        }
+
+        function removeUnitToGraveyard(hex) {
+            const wasTemporary = isTemporaryUnit(hex.id); // 이미 부활했다가 다시 죽는 거라면, 다시는 부활 대상이 되지 않도록 함
+            graveyardArray.push({ isRoyal: false, name: hex.unit, img: hex.img, team: hex.unitOwner, hexId: wasTemporary ? null : hex.id });
+            hex.stack -= 1;
+            if (hex.stack <= 0) {
+                // 임시로 부활했던 유닛이 다시 죽었다면, 나중에 또 사라지지 않도록 추적 목록에서도 제거
+                temporaryUnits = temporaryUnits.filter(u => u.hexId !== hex.id);
+                hex.unit = null; hex.unitOwner = null; hex.img = null; hex.stack = 0;
+            }
+        }
+
         function checkWinCondition() {
             if (gameEnded) return;
             const blueControl = hexGridData.filter(h => h.type === 'control' && h.baseOwner === 'blue').length;
@@ -840,17 +917,23 @@
                 openCommandModal(targetHexId, tokenIndex, token); return;
             }
 
+            if (action === '사령관_대상선택') {
+                openCommanderAttack(targetHexId, tokenIndex, token); return;
+            }
+
             if (action === '배치') {
                 targetHex.unit = token.name; targetHex.unitOwner = myTeam; targetHex.img = token.img; targetHex.stack = 1;
                 handArray.splice(tokenIndex, 1);
-                discardArray.push(token);
+                // 이 토큰은 이제 보드 위 유닛(stack)으로 존재하는 것이므로 버림패로 보내지 않는다.
+                // 버림패로 보내면서 동시에 유닛으로도 존재하게 되어, 나중에 죽을 때 묘지에도 쌓이고
+                // 버림패 쪽 사본은 그대로 남아 주머니로 계속 재순환되면서 토큰 총량이 무한히 늘어나는 버그가 있었음.
 
                 socket.emit('gameAction', { roomId, actionData: { action: 'executeAction', subAction: '배치', hexId: targetHexId, token, team: myTeam } });
             }
             else if (action === '강화') {
                 targetHex.stack += 1;
-                const usedToken = handArray.splice(tokenIndex, 1)[0];
-                discardArray.push(usedToken);
+                handArray.splice(tokenIndex, 1);
+                // 배치와 마찬가지로, 강화에 쓴 토큰도 보드 위 스택으로 흡수되는 것이므로 버림패로 보내지 않는다.
 
                 socket.emit('gameAction', { roomId, actionData: { action: 'executeAction', subAction: '강화', hexId: targetHexId, token, team: myTeam } });
             }
@@ -885,11 +968,11 @@
                     socket.emit('gameAction', { roomId, actionData: { action: 'executeAction', subAction: '검사_연계이동', sourceHexId, targetHexId, token, team: myTeam } });
                 }
             }
-            else if (action === '공격' || action === '지시_공격' || action === '기마병_연계공격') {
+            else if (action === '공격' || action === '지시_공격' || action === '기마병_연계공격' || action === '사령관_공격') {
                 const sourceHex = hexGridData.find(h => h.id === sourceHexId);
                 let blocked = false;
 
-                // 방패병 능력: 화살 공격(궁수/석궁 사수)을 전부 무력화
+                // 방패병 능력: 화살 공격(궁수/석궁 사수)을 전부 무력화 (투석병의 투석 공격은 막지 못함)
                 if (targetHex.unit === '방패병' && attackType === '화살공격') {
                     showGameToast('🛡️ 방패병이 화살 공격을 막아냈습니다!');
                     blocked = true;
@@ -902,28 +985,28 @@
                     // 파이크병 근접 반격
                     if (targetHex.unit === '파이크병' && attackType === '근접') {
                         showGameToast('🔱 파이크병이 반격했습니다!');
-                        graveyardArray.push({ isRoyal: false, name: sourceHex.unit, img: sourceHex.img });
-                        sourceHex.stack -= 1;
-                        if (sourceHex.stack <= 0) {
-                            sourceHex.unit = null; sourceHex.unitOwner = null; sourceHex.img = null; sourceHex.stack = 0;
-                        }
+                        removeUnitToGraveyard(sourceHex);
                     }
 
-                    graveyardArray.push({ isRoyal: false, name: targetHex.unit, img: targetHex.img });
-                    targetHex.stack -= 1;
-                    if (targetHex.stack <= 0) {
-                        targetHex.unit = null; targetHex.unitOwner = null; targetHex.img = null; targetHex.stack = 0;
+                    removeUnitToGraveyard(targetHex);
+
+                    // 투석병: 대상과 인접한 적에게도 splash 피해
+                    if (attackType === '투석공격') {
+                        getAdjacentHexes(targetHex).filter(h => h.unit && h.unitOwner !== myTeam).forEach(splashHex => {
+                            showGameToast('💥 투석 공격이 주변까지 휩쓸었습니다!');
+                            removeUnitToGraveyard(splashHex);
+                        });
                     }
                 }
 
-                if (action === '공격' || action === '지시_공격') {
+                if (action === '공격' || action === '지시_공격' || action === '사령관_공격') {
                     const usedToken = handArray.splice(tokenIndex, 1)[0];
                     discardArray.push(usedToken);
 
                     socket.emit('gameAction', { roomId, actionData: { action: 'executeAction', subAction: action, sourceHexId, targetHexId, token, team: myTeam, attackType, blocked } });
 
-                    // ⚔️ 검사 특수 능력 Check: 공격 후 이동 가능한 빈 칸이 있으면 추가 이동 연계 (군기 지시로 공격한 경우는 제외)
-                    if (action === '공격' && token.name === '검사' && sourceHex.unit === '검사') {
+                    // ⚔️ 검사 특수 능력 Check: 공격 후 이동 가능한 빈 칸이 있으면 추가 이동 연계 (군기/사령관 지시로 공격한 경우는 제외)
+                    if (action === '공격' && token.name === '검사' && sourceHex.unit === '검사' && !isTemporaryUnit(sourceHex.id)) {
                         const emptyAdj = getAdjacentEmptyHexes(sourceHex);
                         if (emptyAdj.length > 0) {
                             followUpContext = { unitHexId: sourceHex.id, targets: emptyAdj.map(e => ({ hexId: e.id, sourceId: sourceHex.id })) };
@@ -1189,6 +1272,7 @@
         // 왕국 토큰으로 '주도권'을 확보해둔 경우, 다음 턴은 정상 교대 대신 주도권을 가진 팀이 가져감(연속 턴 가능)
         function checkTurnEnd() {
             if (handArray.length === 0) {
+                decrementTempUnitsForTeam(myTeam);
                 let nextTeam;
                 let initiativeConsumed = false;
                 if (initiativeHolder) {
@@ -1205,9 +1289,44 @@
                 socket.emit('gameAction', { roomId, actionData: { action: 'endTurn', nextTeam, initiativeConsumed } });
             }
         }
+        // 사령관: 지정한 아군이 자기 고유 능력 그대로 공격할 수 있는 대상 목록을 만든다 (이동 지시는 불가)
+        function openCommanderAttack(allyHexId, tokenIndex, token) {
+            const allyHex = hexGridData.find(h => h.id === allyHexId);
+            let targets = [];
+
+            if (allyHex.unit !== '궁수' && allyHex.unit !== '석궁사수' && allyHex.unit !== '투석병') {
+                getAdjacentHexes(allyHex).filter(h => h.unit && h.unitOwner !== myTeam).forEach(t => {
+                    targets.push({ hexId: t.id, sourceId: allyHex.id, attackType: '근접' });
+                });
+            }
+            if (allyHex.unit === '궁수') {
+                getHexesAtDistance2(allyHex).filter(h => h.unit && h.unitOwner !== myTeam).forEach(t => {
+                    if (!targets.some(x => x.hexId === t.id)) targets.push({ hexId: t.id, sourceId: allyHex.id, attackType: '화살공격' });
+                });
+            }
+            if (allyHex.unit === '석궁사수') {
+                getAdjacentHexes(allyHex).filter(h => h.unit && h.unitOwner !== myTeam).forEach(t => {
+                    if (!targets.some(x => x.hexId === t.id)) targets.push({ hexId: t.id, sourceId: allyHex.id, attackType: '화살공격' });
+                });
+                getStraightLineHexesAtDistance2(allyHex).filter(h => h.unit && h.unitOwner !== myTeam).forEach(t => {
+                    if (!targets.some(x => x.hexId === t.id)) targets.push({ hexId: t.id, sourceId: allyHex.id, attackType: '화살공격' });
+                });
+            }
+            if (allyHex.unit === '투석병') {
+                getHexesAtDistance2(allyHex).filter(h => h.unit && h.unitOwner !== myTeam).forEach(t => {
+                    if (!targets.some(x => x.hexId === t.id)) targets.push({ hexId: t.id, sourceId: allyHex.id, attackType: '투석공격' });
+                });
+            }
+
+            if (targets.length === 0) { alert('이 아군은 지금 공격할 대상이 없습니다!'); currentActionContext = null; renderFlatHexBoard(); return; }
+
+            currentActionContext = { action: '사령관_공격', tokenIndex, token, targets };
+            renderFlatHexBoard();
+        }
+
         function openCommandModal(allyHexId, tokenIndex, token) {
             const allyHex = hexGridData.find(h => h.id === allyHexId);
-            const canMove = getAdjacentEmptyHexes(allyHex).length > 0;
+            const canMove = getAdjacentEmptyHexes(allyHex).length > 0 && !isTemporaryUnit(allyHex.id);
             // 군기의 지시는 유닛의 특수 능력과 무관하게 항상 '기본 공격(인접 1칸)'만 가능
             const canAttack = getAdjacentHexes(allyHex).some(h => h.unit && h.unitOwner !== myTeam);
 
@@ -1293,6 +1412,43 @@
         return;
     }
 
+    // 2-2. 네크로맨서: 부활 처리 (가장 최근에 죽은 아군을 그 자리에서 2턴간 되살림)
+    else if (actionName === '강령술') {
+        const target = getReviveTarget();
+        if (!target) { showGameToast('⚠️ 강령술로 되살릴 수 있는 아군이 없습니다.'); return; }
+
+        const hex = hexGridData.find(h => h.id === target.hexId);
+        hex.unit = target.name; hex.unitOwner = myTeam; hex.img = target.img; hex.stack = 1;
+        temporaryUnits.push({ hexId: hex.id, team: myTeam, unitName: target.name, turnsLeft: 2 });
+
+        const idx = graveyardArray.lastIndexOf(target);
+        if (idx !== -1) graveyardArray.splice(idx, 1);
+
+        const usedToken = handArray.splice(tokenIndex, 1)[0];
+        discardArray.push(usedToken);
+
+        socket.emit('gameAction', {
+            roomId,
+            actionData: { action: 'executeAction', subAction: '강령술', hexId: hex.id, unitName: target.name, unitImg: target.img, token: usedToken, team: myTeam }
+        });
+
+        showGameToast(`💀 강령술로 ${target.name}의 영혼을 2턴 동안 불러냈습니다! (그동안 이동 불가)`, 3000);
+        finishAction();
+        return;
+    }
+
+    // 2-3. 사령관: 원격 지시 처리 (2칸 이내 아군을 지정 -> 그 유닛 고유 능력대로 공격)
+    else if (actionName === '원격지시') {
+        const myUnits = hexGridData.filter(h => h.unit === token.name && h.unitOwner === myTeam);
+        let targets = [];
+        myUnits.forEach(u => {
+            getHexesWithinRange2(u).filter(h => h.unit && h.unitOwner === myTeam).forEach(t => {
+                targets.push({ hexId: t.id, sourceId: u.id });
+            });
+        });
+        if (targets.length > 0) currentActionContext = { action: '사령관_대상선택', tokenIndex, token, targets };
+    }
+
     // 3. 징집 행동 처리
     else if (actionName === '징집') {
         if (token.isRoyal) {
@@ -1336,7 +1492,7 @@
 
     // 6. 이동 행동 처리
     else if (actionName === '이동') {
-        const myUnits = hexGridData.filter(h => h.unit === token.name && h.unitOwner === myTeam);
+        const myUnits = hexGridData.filter(h => h.unit === token.name && h.unitOwner === myTeam && !isTemporaryUnit(h.id));
         let targets = [];
         myUnits.forEach(u => {
             getAdjacentHexes(u).filter(h => h.unit === null).forEach(t => {
@@ -1351,8 +1507,8 @@
         const myUnits = hexGridData.filter(h => h.unit === token.name && h.unitOwner === myTeam);
         let targets = [];
         myUnits.forEach(u => {
-            // 궁수는 근접 공격이 불가능하고 오직 2칸 원거리 사격만 가능
-            if (token.name !== '궁수' && token.name !== '석궁사수') {
+            // 궁수/석궁사수/투석병은 근접 공격이 불가능하고 오직 원거리 공격만 가능
+            if (token.name !== '궁수' && token.name !== '석궁사수' && token.name !== '투석병') {
                 getAdjacentHexes(u).filter(h => h.unit !== null && h.unitOwner !== myTeam).forEach(t => {
                     targets.push({ hexId: t.id, sourceId: u.id, attackType: '근접' });
                 });
@@ -1376,6 +1532,15 @@
                 getStraightLineHexesAtDistance2(u).filter(h => h.unit !== null && h.unitOwner !== myTeam).forEach(t => {
                     if (!targets.some(x => x.hexId === t.id && x.sourceId === u.id)) {
                         targets.push({ hexId: t.id, sourceId: u.id, attackType: '화살공격' });
+                    }
+                });
+            }
+
+            // 투석병: 2칸 거리(방향 무관) 공격, 명중 시 주변 적에게도 splash 피해 (근접 불가, 방패병도 못 막음)
+            if (token.name === '투석병') {
+                getHexesAtDistance2(u).filter(h => h.unit !== null && h.unitOwner !== myTeam).forEach(t => {
+                    if (!targets.some(x => x.hexId === t.id && x.sourceId === u.id)) {
+                        targets.push({ hexId: t.id, sourceId: u.id, attackType: '투석공격' });
                     }
                 });
             }
@@ -1474,16 +1639,17 @@
                     else {
                         const myUnits = hexGridData.filter(h => h.unit === token.name && h.unitOwner === myTeam);
                         const isOnBoard = myUnits.length > 0;
-                        let canMove = false; let canAttack = false; let canCommand = false; let canSwap = false;
+                        let canMove = false; let canAttack = false; let canCommand = false; let canSwap = false; let canCommandRanged = false;
 
                         if (isOnBoard) {
                             myUnits.forEach(u => {
-                                if (getAdjacentEmptyHexes(u).length > 0) canMove = true;
-                                
-                                if (token.name !== '궁수' && token.name !== '석궁사수') {
+                                // 네크로맨서로 부활한 임시 유닛은 남은 기간 동안 이동 불가 (그 자리에서 방어만)
+                                if (getAdjacentEmptyHexes(u).length > 0 && !isTemporaryUnit(u.id)) canMove = true;
+
+                                if (token.name !== '궁수' && token.name !== '석궁사수' && token.name !== '투석병') {
                                     if (getAdjacentHexes(u).some(h => h.unit && h.unitOwner !== myTeam)) canAttack = true;
                                 }
-                                
+
                                 if (token.name === '석궁사수') {
                                     if (getAdjacentHexes(u).some(h => h.unit && h.unitOwner !== myTeam)) canAttack = true;
                                     if (getStraightLineHexesAtDistance2(u).some(h => h.unit && h.unitOwner !== myTeam)) canAttack = true;
@@ -1491,9 +1657,16 @@
                                 else if (token.name === '궁수') {
                                     if (getHexesAtDistance2(u).some(h => h.unit && h.unitOwner !== myTeam)) canAttack = true;
                                 }
-                                
+                                else if (token.name === '투석병') {
+                                    if (getHexesAtDistance2(u).some(h => h.unit && h.unitOwner !== myTeam)) canAttack = true;
+                                }
+
                                 if (token.name === '군기') {
                                     if (getAdjacentHexes(u).some(h => h.unit && h.unitOwner === myTeam)) canCommand = true;
+                                }
+
+                                if (token.name === '사령관') {
+                                    if (getHexesWithinRange2(u).some(h => h.unit && h.unitOwner === myTeam)) canCommandRanged = true;
                                 }
 
                                 if (token.name === '마법사') {
@@ -1501,7 +1674,7 @@
                                 }
                             });
                         }
-                        
+
                         const canReinforce = isOnBoard;
                         const emptyMainBases = token.name === '정찰병'
                             ? hexGridData.filter(h => h.baseOwner === myTeam && h.unit === null)
@@ -1510,12 +1683,15 @@
                         const canControl = isOnBoard && myUnits.some(h => h.type === 'control' && h.baseOwner !== myTeam);
                         const hasSupply = supplyData[token.name] && supplyData[token.name].count > 0;
                         const canRecruit = !isOnBoard && !canDeploy && hasSupply;
+                        const canRevive = (token.name === '네크로맨서') && getReviveTarget() !== null;
 
                         if (canMove) actions.push('이동');
                         if (canAttack) actions.push('공격');
                         if (canReinforce) actions.push('강화');
                         if (canCommand) actions.push('지시');
+                        if (canCommandRanged) actions.push('원격지시');
                         if (canSwap) actions.push('교환');
+                        if (canRevive) actions.push('강령술');
                         if (canDeploy) actions.push('배치');
                         if (canControl) actions.push('점령');
                         if (canRecruit) actions.push('징집'); 
@@ -1524,7 +1700,7 @@
 
                     actions.forEach(action => {
                         const btn = document.createElement('button');
-                        btn.className = `action-btn ${action === '징집' ? 'recruit' : ''} ${action === '강화' ? 'reinforce' : ''} ${action === '이동' ? 'move' : ''} ${action === '공격' ? 'attack' : ''} ${action === '점령' ? 'control' : ''} ${action === '지시' ? 'command-ability' : ''} ${action === '교환' ? 'swap' : ''} ${action === '패스' ? 'pass' : ''}`;
+                        btn.className = `action-btn ${action === '징집' ? 'recruit' : ''} ${action === '강화' ? 'reinforce' : ''} ${action === '이동' ? 'move' : ''} ${action === '공격' && token.name === '투석병' ? 'catapult-attack' : (action === '공격' ? 'attack' : '')} ${action === '점령' ? 'control' : ''} ${action === '지시' ? 'command-ability' : ''} ${action === '원격지시' ? 'command-ranged' : ''} ${action === '교환' ? 'swap' : ''} ${action === '강령술' ? 'necromancy' : ''} ${action === '패스' ? 'pass' : ''}`;
                         btn.innerText = action; btn.onclick = (e) => { e.stopPropagation(); executeAction(action, index, token); };
                         menu.appendChild(btn);
                     });
